@@ -46,7 +46,7 @@ _log = idaeslog.getLogger(__name__)
 
 # Name of the unit model
 @declare_process_block_class("Electrodialysis0D")
-class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idaes.core
+class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idaes.core, this is a child class
     """
     0D Electrodialysis Model
     """
@@ -154,7 +154,7 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
     
 
 
-        # Build control volume for dilute side
+        # Build control volume for dilute side , @xb: from idaes core
         self.dilute_side = ControlVolume0DBlock(default={
             "dynamic": False,
             "has_holdup": False,
