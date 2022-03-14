@@ -46,12 +46,20 @@ _log = idaeslog.getLogger(__name__)
 
 # Name of the unit model
 @declare_process_block_class("Electrodialysis0D")
+<<<<<<< HEAD
 class Electrodialysis0DData(UnitModelBlockData):
+=======
+class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idaes.core, this is a child class
+>>>>>>> 097552fa3992d70c4a1ac3bfc97ecee1b2fc1e53
     """
     0D Electrodialysis Model
     """
     # CONFIG are options for the unit model
+<<<<<<< HEAD
     CONFIG = ConfigBlock()
+=======
+    CONFIG = ConfigBlock() #@xb: ConfigBlock in pyomo.common.config
+>>>>>>> 097552fa3992d70c4a1ac3bfc97ecee1b2fc1e53
 
     CONFIG.declare("dynamic", ConfigValue(
         domain=In([False]),
@@ -67,7 +75,11 @@ class Electrodialysis0DData(UnitModelBlockData):
         description="Holdup construction flag - must be False",
         doc="""Indicates whether holdup terms should be constructed or not.
     **default** - False. The filtration unit does not have defined volume, thus
+<<<<<<< HEAD
     this must be False."""))
+=======
+    this must be False.""")) #what does holdup mean? define a volume?
+>>>>>>> 097552fa3992d70c4a1ac3bfc97ecee1b2fc1e53
 
     CONFIG.declare("material_balance_type", ConfigValue(
         default=MaterialBalanceType.useDefault,
@@ -143,7 +155,11 @@ class Electrodialysis0DData(UnitModelBlockData):
         super().build()
 
         # this creates blank scaling factors, which are populated later
+<<<<<<< HEAD
         self.scaling_factor = Suffix(direction=Suffix.EXPORT)
+=======
+        self.scaling_factor = Suffix(direction=Suffix.EXPORT) #Suffix to export to solver or from solver?
+>>>>>>> 097552fa3992d70c4a1ac3bfc97ecee1b2fc1e53
 
         # Next, get the base units of measurement from the property definition
         units_meta = self.config.property_package.get_metadata().get_derived_units
@@ -151,8 +167,15 @@ class Electrodialysis0DData(UnitModelBlockData):
         # Add unit variables and parameters
         # # TODO: Add material props for membranes and such here
 
+<<<<<<< HEAD
 
         # Build control volume for dilute side
+=======
+    
+
+
+        # Build control volume for dilute side , @xb: from idaes core
+>>>>>>> 097552fa3992d70c4a1ac3bfc97ecee1b2fc1e53
         self.dilute_side = ControlVolume0DBlock(default={
             "dynamic": False,
             "has_holdup": False,
