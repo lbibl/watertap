@@ -46,12 +46,12 @@ _log = idaeslog.getLogger(__name__)
 
 # Name of the unit model
 @declare_process_block_class("Electrodialysis0D")
-class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idaes.core, this is a child class
+class Electrodialysis0DData(UnitModelBlockData):
     """
     0D Electrodialysis Model
     """
     # CONFIG are options for the unit model
-    CONFIG = ConfigBlock() #@xb: ConfigBlock in pyomo.common.config
+    CONFIG = ConfigBlock()
 
     CONFIG.declare("dynamic", ConfigValue(
         domain=In([False]),
@@ -67,7 +67,7 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
         description="Holdup construction flag - must be False",
         doc="""Indicates whether holdup terms should be constructed or not.
     **default** - False. The filtration unit does not have defined volume, thus
-    this must be False.""")) #what does holdup mean? define a volume?
+    this must be False."""))
 
     CONFIG.declare("material_balance_type", ConfigValue(
         default=MaterialBalanceType.useDefault,
@@ -143,18 +143,30 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
         super().build()
 
         # this creates blank scaling factors, which are populated later
-        self.scaling_factor = Suffix(direction=Suffix.EXPORT) #Suffix to export to solver or from solver?
+        self.scaling_factor = Suffix(direction=Suffix.EXPORT)
 
         # Next, get the base units of measurement from the property definition
         units_meta = self.config.property_package.get_metadata().get_derived_units
 
         # Add unit variables and parameters
         # # TODO: Add material props for membranes and such here
+        #   membrane area
+        self.memrane_area = Param(
+            domain=NonNegativeReals,
+            initialize=1,
+            mutable=True,
+            units=units_meta('length')**2,
+            doc='Membrane area')
 
-    
+        self.memrane_thickness = Param(
+            domain=NonNegativeReals,
+            initialize=0.001,
+            mutable=True,
+            units=units_meta('length'),
+            doc='Membrane thickness')
 
 
-        # Build control volume for dilute side , @xb: from idaes core
+        # Build control volume for dilute side
         self.dilute_side = ControlVolume0DBlock(default={
             "dynamic": False,
             "has_holdup": False,
@@ -217,7 +229,30 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
         #           (vars can be indexed by species, so we only write it once)
         #
         #           Those vars will be coupled into the mass_transfer_term below
-        #           and will be of opposite sign for each channel 
+        #           and will be of opposite sign for each channel
+        self.diffusive_flux = Var(
+            self.flowsheet().config.time,
+            self.config.property_package.phase_list,
+            self.config.property_package.component_list,
+            initialize=1e-9,
+            bounds=(1e-18, 1),
+            domain=NonNegativeReals,
+            units=units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
+            doc='Diffusion flux across membrane')
+
+        @self.Constraint(self.flowsheet().config.time,
+                         self.config.property_package.phase_list,
+                         self.config.property_package.component_list,
+                         doc="Equation for diffusive flux")
+        def eq_diff_flux(self, t, p, j):
+            if j == 'H2O':
+                return self.diffusive_flux[t, p, j] == 0
+            else:
+                return self.diffusive_flux[t, p, j] == ( self.concentrate_side.properties_in[t].diffus_phase_comp[p, j] /
+                                                self.memrane_thickness *
+                                            (self.concentrate_side.properties_out[t].conc_mol_phase_comp[p, j] -
+                                            self.dilute_side.properties_out[t].conc_mol_phase_comp[p, j]) )
+
 
         # # TODO: Summate the flux terms for each mass transfer term in each domain
         # Add constraints for mass transfer terms (dilute_side)
@@ -226,7 +261,11 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
                          self.config.property_package.component_list,
                          doc="Mass transfer term on dilute side")
         def eq_mass_transfer_term_dilute(self, t, p, j):
-            return self.dilute_side.mass_transfer_term[t, p, j] == 0.0
+            if j == 'H2O':
+                # do something else
+                return self.dilute_side.mass_transfer_term[t, p, j] == 0.0
+            else:
+                return self.dilute_side.mass_transfer_term[t, p, j] == -self.diffusive_flux[t, p, j]*self.memrane_area
 
         # Add constraints for mass transfer terms (concentrate_side)
         @self.Constraint(self.flowsheet().config.time,
@@ -234,7 +273,11 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
                          self.config.property_package.component_list,
                          doc="Mass transfer term concentrate side")
         def eq_mass_transfer_term_concentrate(self, t, p, j):
-            return self.concentrate_side.mass_transfer_term[t, p, j] == 0.0
+            if j == 'H2O':
+                # do something else
+                return self.concentrate_side.mass_transfer_term[t, p, j] == 0.0
+            else:
+                return self.concentrate_side.mass_transfer_term[t, p, j] == self.diffusive_flux[t, p, j]*self.memrane_area
 
     # initialize method
     def initialize(
@@ -309,3 +352,10 @@ class Electrodialysis0DData(UnitModelBlockData):#@xb: UnitModelBlockData in idae
         units_meta = self.config.property_package.get_metadata().get_derived_units
 
         # # TODO: Add scaling factors
+
+    def _get_stream_table_contents(self, time_point=0):
+        return create_stream_table_dataframe({"Dilute Side Inlet": self.inlet_dilute,
+                                              "Concentrate Side Inlet": self.inlet_concentrate,
+                                              "Dilute Side Outlet": self.outlet_dilute,
+                                              "Concentrate Side Outlet": self.outlet_concentrate},
+                                                time_point=time_point)
