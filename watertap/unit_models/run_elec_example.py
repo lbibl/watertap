@@ -88,9 +88,9 @@ results = solver.solve(m, tee=True)
 #m.fs.unit.pprint()
 
 # Display the material balance constraints
-m.fs.unit.dilute_side.material_balances.pprint()
-m.fs.unit.concentrate_side.material_balances.pprint()
+m.fs.unit.diluate_channel.material_balances.pprint()
+m.fs.unit.concentrate_channel.material_balances.pprint()
 
 # Display the mass transfer terms 
-m.fs.unit.dilute_side.mass_transfer_term.pprint()
-m.fs.unit.concentrate_side.mass_transfer_term.pprint()
+m.fs.unit.diluate_channel.mass_transfer_term.pprint()
+m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
