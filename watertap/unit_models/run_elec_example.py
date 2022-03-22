@@ -48,14 +48,14 @@ assert_units_consistent(m)
 
 
 # specify the feed for each inlet stream
-m.fs.unit.inlet_dilute.pressure.fix(101325)
-m.fs.unit.inlet_dilute.temperature.fix(298.15)
-m.fs.unit.inlet_dilute.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(1)
-m.fs.unit.inlet_dilute.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.01)
-m.fs.unit.inlet_dilute.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.01)
+m.fs.unit.inlet_diluate.pressure.fix(101325)
+m.fs.unit.inlet_diluate.temperature.fix(298.15)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(1)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.01)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.01)
 
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
-m.fs.unit.inlet_concentrate.temperature.fix(298.15)
+m.fs.unit.inlet_concentrate.temperature.fix(298.15)cç
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(1)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.01)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.01)
