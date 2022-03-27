@@ -1,0 +1,123 @@
+from pyomo.environ import ConcreteModel, SolverFactory, TerminationCondition, \
+    value, Constraint, Var, Objective, Expression
+from pyomo.environ import units as pyunits
+from pyomo.util.check_units import assert_units_consistent, assert_units_equivalent, check_units_equivalent
+import pyomo.util.infeasible as infeas
+from idaes.core import FlowsheetBlock
+from idaes.core.util.model_statistics import degrees_of_freedom, number_variables
+import idaes.core.util.model_statistics as stats
+from idaes.core.util.constants import Constants
+import idaes.core.util.scaling as iscale
+import idaes.logger as idaeslog
+
+from watertap.property_models.ion_DSPMDE_prop_pack import DSPMDEParameterBlock
+from electrodialysis_0D import Electrodialysis0D
+
+from idaes.core.util import get_solver
+
+solver = get_solver()
+
+# create model, flowsheet
+m = ConcreteModel()
+m.fs = FlowsheetBlock(default={"dynamic": False})
+# create dict to define ions (the prop pack of Adam requires this)
+ion_dict = {
+    "solute_list": ["Na_+", "Cl_-"],
+    "diffusivity_data": {("Liq", "Na_+"): 1.33e-9,
+                         ("Liq", "Cl_-"): 2.03e-9},
+    "mw_data": {"H2O": 18e-3,
+                "Na_+": 23e-3,
+                "Cl_-": 35e-3},
+    "stokes_radius_data": {"Na_+": 0.184e-9,
+                           "Cl_-": 0.121e-9},
+    "charge": {"Na_+": 1,
+               "Cl_-": -1},
+}
+
+ion_tran_num = {('cem','Na_+'): 1, ('cem', 'Cl_-'):0, ('aem','Na_+'): 0, ('aem', 'Cl_-'):1}
+water_trans_number = {'cem': 5, 'aem': 5}
+water_permeability = 2.16e-14
+
+# attach prop pack to flowsheet
+m.fs.properties = DSPMDEParameterBlock(default=ion_dict)
+
+# build the unit model, pass prop pack to the model
+m.fs.unit = Electrodialysis0D(default={
+    "property_package": m.fs.properties })
+
+
+print('----------------------------------------------')
+print('DOF before specifying:', degrees_of_freedom(m.fs))
+
+assert_units_consistent(m)
+
+
+# specify the feed for each inlet stream
+m.fs.unit.inlet_diluate.pressure.fix(101325)
+m.fs.unit.inlet_diluate.temperature.fix(298.15)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
+
+m.fs.unit.inlet_concentrate.pressure.fix(101325)
+m.fs.unit.inlet_concentrate.temperature.fix(298.15)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
+
+#m.fs.unit.T.fix(298.15)
+#m.fs.unit.R.fix()
+#m.fs.unit.vHcoef.fix()
+#m.fs.unit.osmotic_coef.fix()
+m.fs.unit.water_permeability_membrane.fix(water_permeability)
+#m.fs.unit.faraday_const.fix()
+#m.fs.unit.water_density.fix()
+#m.fs.unit.water_MW.fix()
+m.fs.unit.cell_width.fix(0.1)
+m.fs.unit.cell_length.fix(0.43)
+m.fs.unit.ion_trans_number_membrane.fix(ion_tran_num)
+m.fs.unit.water_trans_number_membrane.fix(5)
+
+
+m.fs.unit.current.fix(1)
+
+
+print('----------------------------------------------')
+print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
+if degrees_of_freedom(m.fs) != 0:
+    print("error")
+    exit()
+
+
+# set scaling factors for state vars and call the 'calculate_scaling_factors' function
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1, index=('Liq', 'H2O'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'Na_+'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'Cl_-'))
+
+# NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
+#iscale.calculate_scaling_factors(m.fs)
+
+# Intialize the model
+m.fs.unit.initialize(optarg=solver.options, outlvl=idaeslog.DEBUG)
+
+# Solve the model
+results = solver.solve(m, tee=True)
+
+# Display results 'cleanly'
+# NOTE: This doesn't work because the 'report' function is
+#       expecting our ports to be named 'inlet' and 'outlet',
+#       respectively
+#m.fs.unit.report()
+
+# Display full set of model info on the unit
+#m.fs.unit.pprint()
+
+# Display the material balance constraints
+m.fs.unit.diluate_channel.material_balances.pprint()
+m.fs.unit.concentrate_channel.material_balances.pprint()
+
+# Display the mass transfer terms 
+m.fs.unit.diluate_channel.mass_transfer_term.pprint()
+m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
+
+#m.fs.unit.report()
