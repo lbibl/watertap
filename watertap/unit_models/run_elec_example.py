@@ -4,7 +4,7 @@ from pyomo.environ import units as pyunits
 from pyomo.util.check_units import assert_units_consistent, assert_units_equivalent, check_units_equivalent
 import pyomo.util.infeasible as infeas
 from idaes.core import FlowsheetBlock
-from idaes.core.util.model_statistics import degrees_of_freedom, number_variables
+from idaes.core.util.model_statistics import degrees_of_freedom, number_variables,number_unfixed_variables, number_total_constraints,report_statistics
 import idaes.core.util.model_statistics as stats
 from idaes.core.util.constants import Constants
 import idaes.core.util.scaling as iscale
@@ -47,7 +47,10 @@ m.fs.unit = Electrodialysis0D(default={
 
 
 print('----------------------------------------------')
-print('DOF before specifying:', degrees_of_freedom(m.fs))
+#print('DOF before specifying:', degrees_of_freedom(m.fs))
+#print('number of var beofre specifying:', number_variables(m.fs))
+#print('number of constr beofre specifying:', number_total_constraints(m.fs))
+print('report model statistics before specifying',report_statistics(m.fs))
 
 assert_units_consistent(m)
 
@@ -59,32 +62,45 @@ m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
 
+
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
 m.fs.unit.inlet_concentrate.temperature.fix(298.15)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
 
-#m.fs.unit.T.fix(298.15)
+
+
+m.fs.unit.water_trans_number_membrane.fix(5)
+m.fs.unit.water_permeability_membrane.fix(water_permeability)
+m.fs.unit.current.fix(1)
+m.fs.unit.current_utilization.fix(1)
+m.fs.unit.cell_width.fix(0.1)
+m.fs.unit.cell_length.fix(0.43)
+#m.fs.unit.T = 298.15
+m.fs.unit.membrane_thickness.fix(1e-4)
+m.fs.unit.ion_diffusivity_membrane.fix(1e-10)
+m.fs.unit.ion_trans_number_membrane['cem','Na_+'].fix(1)
+m.fs.unit.ion_trans_number_membrane['aem','Na_+'].fix(0)
+m.fs.unit.ion_trans_number_membrane['cem','Cl_-'].fix(0)
+m.fs.unit.ion_trans_number_membrane['aem','Cl_-'].fix(1)
+
 #m.fs.unit.R.fix()
 #m.fs.unit.vHcoef.fix()
 #m.fs.unit.osmotic_coef.fix()
-m.fs.unit.water_permeability_membrane.fix(water_permeability)
 #m.fs.unit.faraday_const.fix()
 #m.fs.unit.water_density.fix()
 #m.fs.unit.water_MW.fix()
-m.fs.unit.cell_width.fix(0.1)
-m.fs.unit.cell_length.fix(0.43)
-m.fs.unit.ion_trans_number_membrane.fix(ion_tran_num)
-m.fs.unit.water_trans_number_membrane.fix(5)
-
-
-m.fs.unit.current.fix(1)
 
 
 print('----------------------------------------------')
-print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
-if degrees_of_freedom(m.fs) != 0:
+#print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
+#print('number of var after specifyig', number_variables(m.fs))
+#print('number of unfixed var after specifying', number_unfixed_variables(m.fs))
+#print('number of constr after specifying', number_total_constraints(m.fs))
+print('report model statistics after specifying',report_statistics(m.fs))
+
+if degrees_of_freedom(m.fs) > 0:
     print("error")
     exit()
 

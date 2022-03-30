@@ -45,6 +45,7 @@ from idaes.core.util.exceptions import ConfigurationError
 import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslog
 from sympy import Domain, Integer, Integers
+from idaes.core.util.constants import Constants
 
 __author__ = "Austin Ladshaw, Xiangyu Bi"
 
@@ -57,7 +58,7 @@ class Electrodialysis0DData(UnitModelBlockData):
     0D Electrodialysis Model
     """
     # CONFIG are options for the unit model 
-    CONFIG = ConfigBlock()
+    CONFIG = ConfigBlock() #
 
     CONFIG.declare("dynamic", ConfigValue(
         domain=In([False]),
@@ -74,9 +75,9 @@ class Electrodialysis0DData(UnitModelBlockData):
         doc="""Indicates whether holdup terms should be constructed or not.
     **default** - False. The filtration unit does not have defined volume, thus
     this must be False."""))
-
-    CONFIG.declare("constant_current_operation_mode", ConfigValue(
-        default=True,
+# electrical operation  configuration 
+    CONFIG.declare("operation_mode", ConfigValue(
+        default='constant current',
         domain=Boolean,
         description="The electrical operation mode is constatn current",
     ))
@@ -165,19 +166,7 @@ class Electrodialysis0DData(UnitModelBlockData):
       
         # Add unit variables and parameters
         # # TODO: Add material props for membranes and such here
-        self.R = Param (
-            initialize = 8.3145,
-            mutable = False,
-            units =  pyunits.joule * pyunits.mole ** -1 * pyunits.kelvin ** -1,
-            doc = "ideal gas constant"
-        )
-        self.T = Param (
-            initialize = 298.15,
-            mutable = True,
-            units = pyunits.kelvin,
-            doc = "temperature"
-        )
-
+    
         self.water_density = Param(
             initialize = 1000,
             mutable = False,
@@ -191,24 +180,22 @@ class Electrodialysis0DData(UnitModelBlockData):
             doc = "molecular weight of water"
         )
     
-
-    
         # electrodialysis cell properties 
         self.cell_width = Var(
-            initialize = 1,
+            initialize = 0.1,
             bounds = (1e-3, 1e2),
             units = pyunits.meter,
             doc = 'The width of the electrodialysis cell, denoted as b in the model description') # modified Param to Var
         self.cell_length = Var(
-            initialize = 1,
+            initialize = 0.5,
             bounds = (1e-3, 1e2),           
             units = pyunits.meter,
             doc = 'The length of the electrodialysis cell, denoted as l in the model description')
-        self.cell_spacer_thicknes = Var(
-            initialize = 0.001,
-            bounds = (1e-5, 1),
-            units = pyunits.meter,
-            doc ='The distance between concecutive aem and cem, denoted as s in the m.d.')
+        
+        #self.cell_spacer_thicknes = Var(
+         #   initialize = 0.001,
+          # units = pyunits.meter,
+           # doc ='The distance between concecutive aem and cem, denoted as s in the m.d.')
         #self.cell_channel_pair_num = Var(
          #   initialize = 1,
           #  domain = Integers,
@@ -220,56 +207,47 @@ class Electrodialysis0DData(UnitModelBlockData):
         # membrane-related properties
 
         self.membrane_set = Set(initialize = ['cem','aem'])  
-        
-        self.membrane_thickness = Var (
+
+        self.membrane_thickness = Var(
             self.membrane_set, 
-            initialize = 0.001,
+            initialize = 0.0001,
             bounds = (1e-6, 1e-1),
             units = pyunits.meter,
             doc = 'Membrane thickness')
         
-        self.ion_diffusivity_membrane = Var (
+        self.ion_diffusivity_membrane = Var(
             self.membrane_set, ion_set, 
-            initialize = 1e-11,
-            bounds = (0, 1),
+            initialize = 1e-8,
+            bounds = (0, 1e-3),
             units = pyunits.meter ** 2 * pyunits.second ** -1,
             doc = 'ion diffusivity in the membrane phase')
         
-        self.ion_trans_number_membrane = Var (
+        self.ion_trans_number_membrane = Var(
             self.membrane_set, ion_set, 
             bounds = (0, 1),
             units = pyunits.dimensionless,
             doc = 'ion diffusivity in the membrane phase')
 
-        self.water_trans_number_membrane = Var (
+        self.water_trans_number_membrane = Var(
             self.membrane_set,
+            initialize = 5,
             bounds = (0, 1),
             units = pyunits.dimensionless,
             doc = 'transference number of water in membranes'
         )
-        self.water_permeability_membrane = Var (
+        self.water_permeability_membrane = Var(
             self.membrane_set,
-            initialize = 6,
+            initialize = 5,
             units = pyunits.meter * pyunits.second ** -1 * pyunits.pascal ** -1,
             doc = "water permeability coefficient"
         )
-        self.vHcoef = Var (
-            initialize = 1,
-            units = pyunits.dimensionless,
-            doc = "van't Hoff coefficient"
-        )
-
-        self.osmotic_coef = Var (
-            initialize = 1,
-            units = pyunits.dimensionless,
-            doc = "Osmotic coefficient"
-        )
-        self.memb_surf_resistence = Var (
-            self.membrane_set, 
-            initialize = 2e-4,
-            bounds = (1e-6,1),
-            units = pyunits.ohm * pyunits.meter ** 2,
-            doc = 'the surface resistence of membrane')
+       
+       # self.memb_surf_resistence = Var (
+        #    self.membrane_set, 
+         #   initialize = 2e-4,
+          #  bounds = (1e-6,1),
+           # units = pyunits.ohm * pyunits.meter ** 2,
+            #doc = 'the surface resistence of membrane')
         #membrane surface resistence is used for constant voltage mode and power evaluation. 
         #self.solution_equiv_conductivity = Var() need ion mobility param. To be used in constant voltage mode. 
 
@@ -291,11 +269,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             units = pyunits.dimensionless,
             doc = "The current utilization efficiency"
         )
-        self.faraday_const = Param(
-            initialize = 96485,
-            mutable = False,
-            units = pyunits.coulomb * pyunits.mole ** -1
-        )
+       
         # Build control volume for dilute channel
         self.diluate_channel = ControlVolume0DBlock(default={
             "dynamic": False,
@@ -329,7 +303,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             "property_package_args": self.config.property_package_args})
 
         self.concentrate_channel.add_state_blocks(
-            has_phase_equilibrium=False)
+            has_phase_equilibrium=False) # properties in and out
 
         self.concentrate_channel.add_material_balances(
             balance_type=self.config.material_balance_type,
@@ -387,10 +361,10 @@ class Electrodialysis0DData(UnitModelBlockData):
         def eq_elec_migration_flux(self, t, p, j):
             if j == 'H2O':
                 return self.elec_migration_flux[t, p, j] == (self.water_trans_number_membrane['cem'] + self.water_trans_number_membrane['aem']) \
-                    * (self.current / (self.cell_width * self.cell_length) / self.faraday_const) #to add osmositic flux
+                    * (self.current / (self.cell_width * self.cell_length) / Constants.faraday_constant) #to add osmositic flux
             else:
                 return self.elec_migration_flux[t, p, j] == (self.ion_trans_number_membrane['cem', j]-self.ion_trans_number_membrane['aem', j]) \
-                    * (self.current_utilization * self.current / (self.cell_width * self.cell_length)) / (self.config.property_package.charge_comp[j] * self.faraday_const)
+                    * (self.current_utilization * self.current / (self.cell_width * self.cell_length)) / (self.config.property_package.charge_comp[j] * Constants.faraday_constant)
          
         @self.Constraint(self.flowsheet().config.time,
                          self.config.property_package.phase_list,
@@ -399,9 +373,10 @@ class Electrodialysis0DData(UnitModelBlockData):
 
         def eq_nonelec_flux(self, t, p, j):
             if j == 'H2O':
-                return self.nonelec_flux[t, p, j] == self.water_density / self.water_MW * self.vHcoef * self.R * self.T * self.osmotic_coef * (self.water_permeability_membrane['cem'] + self.water_permeability_membrane['aem']) \
-                    * (sum(self.concentrate_channel.properties_out[t].conc_mol_phase_comp[p, j] for j in ion_set) \
-                        - sum(self.diluate_channel.properties_out[t].conc_mol_phase_comp[p, j] for j in ion_set))  
+                return self.nonelec_flux[t, p, j] == self.water_density / self.water_MW * (self.water_permeability_membrane['cem'] + self.water_permeability_membrane['aem']) \
+                * (self.concentrate_channel.properties_out[t].pressure_osm - self.diluate_channel.properties_out[t].pressure_osm)
+                #(self.config.property_package.pressure_osm[t, p] - self.config.property_package.pressure_osm[t, p])
+                #(
             else:
                 return self.nonelec_flux[t, p, j] == - (self.ion_diffusivity_membrane['cem', j] / self.membrane_thickness ['cem'] +self.ion_diffusivity_membrane['aem', j] / self.membrane_thickness ['aem']) \
                      * (self.concentrate_channel.properties_out[t].conc_mol_phase_comp[p, j] - self.diluate_channel.properties_out[t].conc_mol_phase_comp[p, j])
@@ -422,6 +397,14 @@ class Electrodialysis0DData(UnitModelBlockData):
                          doc="Mass transfer term for the concentrate channel")
         def eq_mass_transfer_term_concentrate(self, t, p, j):
             return self.diluate_channel.mass_transfer_term[t, p, j] == (self.elec_migration_flux[t, p, j] + self.nonelec_flux[t, p, j]) * (self.cell_width * self.cell_length)
+        
+        @self.Constraint(self.flowsheet().config.time,
+                         self.config.property_package.phase_list,
+                         self.config.property_package.component_list,
+                         doc="Mass balance between concentrate and diluate channels")
+        def eq_mass_balance_diluate_concentrate(self, t, p, j):
+            return self.diluate_channel.properties_out[t].conc_mol_phase_comp[p, j]+self.concentrate_channel.properties_out[t].conc_mol_phase_comp[p, j] == \
+               self.diluate_channel.properties_in[t].conc_mol_phase_comp[p, j]+self.concentrate_channel.properties_in[t].conc_mol_phase_comp[p, j] 
            
     # initialize method
     def initialize(
@@ -452,22 +435,24 @@ class Electrodialysis0DData(UnitModelBlockData):
 
         # ---------------------------------------------------------------------
         # Initialize diluate_channel block
-        flags = blk.diluate_channel.initialize(
+        flags_diluate = blk.diluate_channel.initialize(
             outlvl=outlvl,
             optarg=optarg,
             solver=solver,
             state_args=state_args,
+            hold_state=True #modified
         )
         init_log.info_high("Initialization Step 1 Complete.")
         # ---------------------------------------------------------------------
 
         # ---------------------------------------------------------------------
         # Initialize concentrate_side block
-        flags = blk.concentrate_channel.initialize(
+        flags_concentrate = blk.concentrate_channel.initialize(
             outlvl=outlvl,
             optarg=optarg,
             solver=solver,
-            state_args=state_args,
+            state_args=state_args, #inlet var 
+            hold_state=True #modified
         )
         init_log.info_high("Initialization Step 2 Complete.")
         # ---------------------------------------------------------------------
@@ -481,11 +466,11 @@ class Electrodialysis0DData(UnitModelBlockData):
 
         # ---------------------------------------------------------------------
         # Release state
-        blk.diluate_channel.release_state(flags, outlvl + 1)
+        blk.diluate_channel.release_state(flags_diluate, outlvl)
         init_log.info(
             "Initialization Complete: {}".format(idaeslog.condition(res))
         )
-        blk.concentrate_channel.release_state(flags, outlvl + 1)
+        blk.concentrate_channel.release_state(flags_concentrate, outlvl)
         init_log.info(
             "Initialization Complete: {}".format(idaeslog.condition(res))
         )
