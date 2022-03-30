@@ -107,8 +107,8 @@ if degrees_of_freedom(m.fs) > 0:
 
 # set scaling factors for state vars and call the 'calculate_scaling_factors' function
 m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1, index=('Liq', 'H2O'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'Na_+'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'Cl_-'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e1, index=('Liq', 'Na_+'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e1, index=('Liq', 'Cl_-'))
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
 #iscale.calculate_scaling_factors(m.fs)
@@ -136,4 +136,4 @@ m.fs.unit.concentrate_channel.material_balances.pprint()
 m.fs.unit.diluate_channel.mass_transfer_term.pprint()
 m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
 
-#m.fs.unit.report()
+m.fs.unit.report()
