@@ -73,7 +73,7 @@ m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
 
 m.fs.unit.water_trans_number_membrane.fix(5)
 m.fs.unit.water_permeability_membrane.fix(water_permeability)
-m.fs.unit.current.fix(1)
+m.fs.unit.current.fix(10)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
@@ -100,7 +100,7 @@ print('----------------------------------------------')
 #print('number of constr after specifying', number_total_constraints(m.fs))
 print('report model statistics after specifying',report_statistics(m.fs))
 
-if degrees_of_freedom(m.fs) > 0:
+if degrees_of_freedom(m.fs) != 0:
     print("error")
     exit()
 
