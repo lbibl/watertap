@@ -175,13 +175,15 @@ class Electrodialysis0DData(UnitModelBlockData):
             mutable = False,
             units = pyunits.kg * pyunits.m ** -3,
             doc = "density of water"
-        )
+        ) # better to be referred from property , to be chaged. 
+
         self.water_MW = Param(
             initialize = 18.015e-3,
             mutable = False,
             units = pyunits.kg * pyunits.mole ** -1,
             doc = "molecular weight of water"
-        )
+        ) # to be check as well 
+
         # electrodialysis cell properties 
         self.cell_width = Var(
             initialize = 0.1,
@@ -275,7 +277,7 @@ class Electrodialysis0DData(UnitModelBlockData):
         '''
         self.diluate_channel.add_momentum_balances(
             balance_type=self.config.momentum_balance_type,
-            has_pressure_change=False)
+            has_pressure_change=False) #related to pressure 
 
         # Build control volume for the concentrate channel
         self.concentrate_channel = ControlVolume0DBlock(default={
@@ -309,13 +311,6 @@ class Electrodialysis0DData(UnitModelBlockData):
         self.add_inlet_port(name='inlet_concentrate', block=self.concentrate_channel)
         self.add_outlet_port(name='outlet_concentrate', block=self.concentrate_channel)
 
-        # -------- Add constraints ---------
-        # # TODO: Add vars and associated constraints for all flux terms
-        #           There will be 1 flux var for water and 1 flux var for all ions
-        #           (vars can be indexed by species, so we only write it once)
-        #
-        #           Those vars will be coupled into the mass_transfer_term below
-        #           and will be of opposite sign for each channel
         self.elec_migration_flux = Var(
             self.flowsheet().config.time,
             self.config.property_package.phase_list,
@@ -371,20 +366,8 @@ class Electrodialysis0DData(UnitModelBlockData):
                          self.config.property_package.component_list,
                          doc="Mass transfer term for the concentrate channel")
         def eq_mass_transfer_term_concentrate(self, t, p, j):
-            return self.diluate_channel.mass_transfer_term[t, p, j] == (self.elec_migration_flux[t, p, j] + self.nonelec_flux[t, p, j]) * (self.cell_width * self.cell_length)
-
-        @self.Constraint(self.flowsheet().config.time,
-                         self.config.property_package.phase_list,
-                         self.config.property_package.component_list,
-                         doc="Mass balance between concentrate and diluate channels")
-        def eq_mass_balance_diluate_concentrate(self, t, p, j):
-            if j != 'H2O':
-           # if  self.config.property_package.get_component(j).is_solute:
-                return self.diluate_channel.properties_out[t].flow_mol_phase_comp[p, j]+self.concentrate_channel.properties_out[t].flow_mol_phase_comp[p, j] == \
-                    self.diluate_channel.properties_in[t].flow_mol_phase_comp[p, j]+self.concentrate_channel.properties_in[t].flow_mol_phase_comp[p, j] 
-            return Constraint.Skip
-            #exit()
-           
+            return self.concentrate_channel.mass_transfer_term[t, p, j] == (self.elec_migration_flux[t, p, j] + self.nonelec_flux[t, p, j]) * (self.cell_width * self.cell_length)
+       
     # initialize method
     def initialize(
             blk,
@@ -456,10 +439,14 @@ class Electrodialysis0DData(UnitModelBlockData):
 
     def calculate_scaling_factors(self):
         super().calculate_scaling_factors()
-
-        units_meta = self.config.property_package.get_metadata().get_derived_units
+        # units_meta = self.config.property_package.get_metadata().get_derived_units
 
         # # TODO: Add scaling factors
+        iscale.set_scaling_factor(self.ion_diffusivity_membrane, 1e9)
+        iscale.set_scaling_factor(self.membrane_thickness, 1e8)
+        iscale.set_scaling_factor(self.water_permeability_membrane, 1e14)
+        iscale.set_scaling_factor(self.water_MW, 1e3)
+        iscale.set_scaling_factor(self.water_density, 1e-3)
 
     def _get_stream_table_contents(self, time_point=0):
         return create_stream_table_dataframe({"Diluate Channel Inlet": self.inlet_diluate,

@@ -36,7 +36,7 @@ ion_dict = {
 
 ion_tran_num = {('cem','Na_+'): 1, ('cem', 'Cl_-'):0, ('aem','Na_+'): 0, ('aem', 'Cl_-'):1}
 water_trans_number = {'cem': 5, 'aem': 5}
-water_permeability = 2.16e-14
+#water_permeability = 2.16e-14
 
 # attach prop pack to flowsheet
 m.fs.properties = DSPMDEParameterBlock(default=ion_dict)
@@ -58,28 +58,30 @@ assert_units_consistent(m)
 # specify the feed for each inlet stream
 m.fs.unit.inlet_diluate.pressure.fix(101325)
 m.fs.unit.inlet_diluate.temperature.fix(298.15)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
+m.fs.unit.outlet_diluate.temperature.fix(298.15)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(24)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.043)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.043)
 
 
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
 m.fs.unit.inlet_concentrate.temperature.fix(298.15)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(11.1)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.1)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.1)
+m.fs.unit.outlet_concentrate.temperature.fix(298.15)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(24)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.043)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.043)
 
 
 
 m.fs.unit.water_trans_number_membrane.fix(5)
-m.fs.unit.water_permeability_membrane.fix(water_permeability)
-m.fs.unit.current.fix(10)
+m.fs.unit.water_permeability_membrane.fix(2e-14)
+m.fs.unit.current.fix(50)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
 #m.fs.unit.T = 298.15
 m.fs.unit.membrane_thickness.fix(1e-4)
-m.fs.unit.ion_diffusivity_membrane.fix(1e-10)
+m.fs.unit.ion_diffusivity_membrane.fix(7e-9)
 m.fs.unit.ion_trans_number_membrane['cem','Na_+'].fix(1)
 m.fs.unit.ion_trans_number_membrane['aem','Na_+'].fix(0)
 m.fs.unit.ion_trans_number_membrane['cem','Cl_-'].fix(0)
@@ -94,21 +96,22 @@ m.fs.unit.ion_trans_number_membrane['aem','Cl_-'].fix(1)
 
 
 print('----------------------------------------------')
-#print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
-#print('number of var after specifyig', number_variables(m.fs))
-#print('number of unfixed var after specifying', number_unfixed_variables(m.fs))
-#print('number of constr after specifying', number_total_constraints(m.fs))
+print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
+print('number of var after specifyig', number_variables(m.fs))
+print('number of unfixed var after specifying', number_unfixed_variables(m.fs))
+print('number of constr after specifying', number_total_constraints(m.fs))
 print('report model statistics after specifying',report_statistics(m.fs))
 
+#m.fs.unit.pprint()
 if degrees_of_freedom(m.fs) != 0:
     print("error")
     exit()
 
 
 # set scaling factors for state vars and call the 'calculate_scaling_factors' function
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1, index=('Liq', 'H2O'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e1, index=('Liq', 'Na_+'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e1, index=('Liq', 'Cl_-'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e-1, index=('Liq', 'H2O'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 10, index=('Liq', 'Na_+'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 10, index=('Liq', 'Cl_-'))
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
 #iscale.calculate_scaling_factors(m.fs)
@@ -137,3 +140,4 @@ m.fs.unit.diluate_channel.mass_transfer_term.pprint()
 m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
 
 m.fs.unit.report()
+
