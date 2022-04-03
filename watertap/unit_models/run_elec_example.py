@@ -59,28 +59,29 @@ assert_units_consistent(m)
 m.fs.unit.inlet_diluate.pressure.fix(101325)
 m.fs.unit.inlet_diluate.temperature.fix(298.15)
 m.fs.unit.outlet_diluate.temperature.fix(298.15)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(24)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.043)
-m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.043)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
+m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 
 
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
 m.fs.unit.inlet_concentrate.temperature.fix(298.15)
 m.fs.unit.outlet_concentrate.temperature.fix(298.15)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(24)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(0.043)
-m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(0.043)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
+m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 
 
 
-m.fs.unit.water_trans_number_membrane.fix(5)
-m.fs.unit.water_permeability_membrane.fix(2e-14)
+m.fs.unit.water_trans_number_membrane.fix(1.9)
+m.fs.unit.water_permeability_membrane['cem'].fix(2.16e-14)
+m.fs.unit.water_permeability_membrane['aem'].fix(1.75e-14)
 m.fs.unit.current.fix(50)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
 #m.fs.unit.T = 298.15
-m.fs.unit.membrane_thickness.fix(1e-4)
+m.fs.unit.membrane_thickness.fix(1.3e-4)
 m.fs.unit.ion_diffusivity_membrane.fix(7e-9)
 m.fs.unit.ion_trans_number_membrane['cem','Na_+'].fix(1)
 m.fs.unit.ion_trans_number_membrane['aem','Na_+'].fix(0)
@@ -109,9 +110,9 @@ if degrees_of_freedom(m.fs) != 0:
 
 
 # set scaling factors for state vars and call the 'calculate_scaling_factors' function
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e-1, index=('Liq', 'H2O'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 10, index=('Liq', 'Na_+'))
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 10, index=('Liq', 'Cl_-'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'H2O'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'Na_+'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'Cl_-'))
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
 #iscale.calculate_scaling_factors(m.fs)
