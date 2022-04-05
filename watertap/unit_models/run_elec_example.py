@@ -11,7 +11,7 @@ import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslog
 
 from watertap.property_models.ion_DSPMDE_prop_pack import DSPMDEParameterBlock
-from electrodialysis_0D import Electrodialysis0D
+from electrodialysis_cstr_0d import Electrodialysis0D
 
 from idaes.core.util import get_solver
 
@@ -58,7 +58,7 @@ assert_units_consistent(m)
 # specify the feed for each inlet stream
 m.fs.unit.inlet_diluate.pressure.fix(101325)
 m.fs.unit.inlet_diluate.temperature.fix(298.15)
-m.fs.unit.outlet_diluate.temperature.fix(298.15)
+#m.fs.unit.outlet_diluate.temperature.fix(298.15)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
@@ -66,7 +66,7 @@ m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
 m.fs.unit.inlet_concentrate.temperature.fix(298.15)
-m.fs.unit.outlet_concentrate.temperature.fix(298.15)
+#m.fs.unit.outlet_concentrate.temperature.fix(298.15)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
@@ -97,10 +97,10 @@ m.fs.unit.ion_trans_number_membrane['aem','Cl_-'].fix(1)
 
 
 print('----------------------------------------------')
-print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
-print('number of var after specifyig', number_variables(m.fs))
-print('number of unfixed var after specifying', number_unfixed_variables(m.fs))
-print('number of constr after specifying', number_total_constraints(m.fs))
+#print('DOF after specifying:', degrees_of_freedom(m.fs)) #should be zero after specifying everything 
+#print('number of var after specifyig', number_variables(m.fs))
+#print('number of unfixed var after specifying', number_unfixed_variables(m.fs))
+#print('number of constr after specifying', number_total_constraints(m.fs))
 print('report model statistics after specifying',report_statistics(m.fs))
 
 #m.fs.unit.pprint()
@@ -115,7 +115,7 @@ m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'N
 m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'Cl_-'))
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
-#iscale.calculate_scaling_factors(m.fs)
+iscale.calculate_scaling_factors(m.fs)
 
 # Intialize the model
 m.fs.unit.initialize(optarg=solver.options, outlvl=idaeslog.DEBUG)
