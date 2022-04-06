@@ -487,6 +487,7 @@ class Electrodialysis0DData(UnitModelBlockData):
         for ind, c in self.eq_isothermal_concentrate.items():
             iscale.constraint_scaling_transform(c, self.concentrate_channel.properties_in[ind].temperature) 
 
+        
 
     def _get_stream_table_contents(self, time_point=0):
         return create_stream_table_dataframe({"Diluate Channel Inlet": self.inlet_diluate,

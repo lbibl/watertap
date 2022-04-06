@@ -116,6 +116,7 @@ m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'C
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
 iscale.calculate_scaling_factors(m.fs)
+print(iscale.get_scaling_factor(m.fs.unit.nonelec_flux[0, 'Liq', 'H2O']))
 
 # Intialize the model
 m.fs.unit.initialize(optarg=solver.options, outlvl=idaeslog.DEBUG)
@@ -131,7 +132,9 @@ results = solver.solve(m, tee=True)
 
 # Display full set of model info on the unit
 #m.fs.unit.pprint()
-
+print('Scaling Inspect')
+iscale.badly_scaled_var_generator(m.fs,large=10000.0, small=0.001, zero=1e-10, descend_into=True, include_fixed=False)
+print(iscale.unscaled_variables_generator(m.fs.unit))
 # Display the material balance constraints
 m.fs.unit.diluate_channel.material_balances.pprint()
 m.fs.unit.concentrate_channel.material_balances.pprint()
