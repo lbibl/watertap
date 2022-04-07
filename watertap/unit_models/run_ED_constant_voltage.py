@@ -34,15 +34,13 @@ ion_dict = {
                "Cl_-": -1},
 }
 
-ion_tran_num = {('cem','Na_+'): 1, ('cem', 'Cl_-'):0, ('aem','Na_+'): 0, ('aem', 'Cl_-'):1}
-water_trans_number = {'cem': 5, 'aem': 5}
-#water_permeability = 2.16e-14
+
 
 # attach prop pack to flowsheet
 m.fs.properties = DSPMDEParameterBlock(default=ion_dict)
 
 # build the unit model, pass prop pack to the model
-m.fs.unit = Electrodialysis0D(default = {"property_package": m.fs.properties})
+m.fs.unit = Electrodialysis0D(default = {"property_package": m.fs.properties, "operation_mode": 'Constant Voltage'})
 
 
 print('----------------------------------------------')
@@ -75,12 +73,17 @@ m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 m.fs.unit.water_trans_number_membrane.fix(1.9)
 m.fs.unit.water_permeability_membrane['cem'].fix(2.16e-14)
 m.fs.unit.water_permeability_membrane['aem'].fix(1.75e-14)
-m.fs.unit.current.fix(50)
+m.fs.unit.voltage.fix(0.1)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
+m.fs.unit.spacer_thickness.fix(1.5e-4)
+m.fs.unit.membrane_surface_resistence['cem'].fix(1.89e-4)
+m.fs.unit.membrane_surface_resistence['aem'].fix(1.77e-4)
+m.fs.unit.slt_eq_conductivity.fix(0.001)
 #m.fs.unit.T = 298.15
-m.fs.unit.membrane_thickness.fix(1.3e-4)
+m.fs.unit.membrane_thickness['cem'].fix(1.3e-4)
+m.fs.unit.membrane_thickness['aem'].fix(1.3e-4)
 m.fs.unit.ion_diffusivity_membrane.fix(7e-9)
 m.fs.unit.ion_trans_number_membrane['cem','Na_+'].fix(1)
 m.fs.unit.ion_trans_number_membrane['aem','Na_+'].fix(0)
