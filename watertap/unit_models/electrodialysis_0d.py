@@ -329,21 +329,37 @@ class Electrodialysis0DData(UnitModelBlockData):
         self.add_inlet_port(name='inlet_concentrate', block=self.concentrate_channel)
         self.add_outlet_port(name='outlet_concentrate', block=self.concentrate_channel)
 
-        self.elec_migration_flux = Var(
+        self.elec_migration_flux_in = Var(
             self.flowsheet().config.time,
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
             #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
-            doc='Molar flux of a component across the membrane driven by electrical migration')
+            doc='Molar flux_in of a component across the membrane driven by electrical migration')
 
-        self.nonelec_flux = Var(
+        self.elec_migration_flux_out = Var(
             self.flowsheet().config.time,
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
             #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
-            doc='Molar flux of a component across the membrane driven by electrical migration')
+            doc='Molar flux_in of a component across the membrane driven by electrical migration')
+
+        self.nonelec_flux_in = Var(
+            self.flowsheet().config.time,
+            self.config.property_package.phase_list,
+            self.config.property_package.component_list,
+            units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
+            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
+            doc='Molar flux_out of a component across the membrane driven by electrical migration')
+
+        self.nonelec_flux_out = Var(
+            self.flowsheet().config.time,
+            self.config.property_package.phase_list,
+            self.config.property_package.component_list,
+            units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
+            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
+            doc='Molar flux_out of a component across the membrane driven by electrical migration')
         
         @self.Constraint(self.flowsheet().config.time,
                          self.config.property_package.phase_list,
@@ -360,26 +376,49 @@ class Electrodialysis0DData(UnitModelBlockData):
         @self.Constraint(self.flowsheet().config.time,
                          self.config.property_package.phase_list,
                          self.config.property_package.component_list,
-                         doc="Equation for electrical migration flux") 
-        def eq_elec_migration_flux(self, t, p, j):
+                         doc="Equation for electrical migration flux_in") 
+        def eq_elec_migration_flux_in(self, t, p, j):
             if j == 'H2O':
-                return self.elec_migration_flux[t, p, j] == (self.water_trans_number_membrane['cem'] + self.water_trans_number_membrane['aem']) \
+                return self.elec_migration_flux_in[t, p, j] == (self.water_trans_number_membrane['cem'] + self.water_trans_number_membrane['aem']) \
                     * (self.current / (self.cell_width * self.cell_length) / Constants.faraday_constant) 
             else:
-                return self.elec_migration_flux[t, p, j] == (self.ion_trans_number_membrane['cem', j]-self.ion_trans_number_membrane['aem', j]) \
+                return self.elec_migration_flux_in[t, p, j] == (self.ion_trans_number_membrane['cem', j]-self.ion_trans_number_membrane['aem', j]) \
                     * (self.current_utilization * self.current / (self.cell_width * self.cell_length)) / (self.config.property_package.charge_comp[j] * Constants.faraday_constant)
-         
+        
         @self.Constraint(self.flowsheet().config.time,
                          self.config.property_package.phase_list,
                          self.config.property_package.component_list,
-                         doc="Equation for non-electrical flux")
-
-        def eq_nonelec_flux(self, t, p, j):
+                         doc="Equation for electrical migration flux_out") 
+        def eq_elec_migration_flux_out(self, t, p, j):
             if j == 'H2O':
-                return self.nonelec_flux[t, p, j] == self.water_density / self.water_MW * (self.water_permeability_membrane['cem'] + self.water_permeability_membrane['aem']) \
+                return self.elec_migration_flux_out[t, p, j] == (self.water_trans_number_membrane['cem'] + self.water_trans_number_membrane['aem']) \
+                    * (self.current / (self.cell_width * self.cell_length) / Constants.faraday_constant) 
+            else:
+                return self.elec_migration_flux_out[t, p, j] == (self.ion_trans_number_membrane['cem', j]-self.ion_trans_number_membrane['aem', j]) \
+                    * (self.current_utilization * self.current / (self.cell_width * self.cell_length)) / (self.config.property_package.charge_comp[j] * Constants.faraday_constant)
+
+        @self.Constraint(self.flowsheet().config.time,
+                         self.config.property_package.phase_list,
+                         self.config.property_package.component_list,
+                         doc="Equation for non-electrical flux_in")
+        def eq_nonelec_flux_in(self, t, p, j):
+            if j == 'H2O':
+                return self.nonelec_flux_in[t, p, j] == self.water_density / self.water_MW * (self.water_permeability_membrane['cem'] + self.water_permeability_membrane['aem']) \
+                * (self.concentrate_channel.properties_in[t].pressure_osm - self.diluate_channel.properties_in[t].pressure_osm)
+            else:
+                return self.nonelec_flux_in[t, p, j] == - (self.ion_diffusivity_membrane['cem', j] / self.membrane_thickness ['cem'] +self.ion_diffusivity_membrane['aem', j] / self.membrane_thickness ['aem']) \
+                     * (self.concentrate_channel.properties_in[t].conc_mol_phase_comp[p, j] - self.diluate_channel.properties_in[t].conc_mol_phase_comp[p, j])
+        
+        @self.Constraint(self.flowsheet().config.time,
+                         self.config.property_package.phase_list,
+                         self.config.property_package.component_list,
+                         doc="Equation for non-electrical flux_out")
+        def eq_nonelec_flux_out(self, t, p, j):
+            if j == 'H2O':
+                return self.nonelec_flux_out[t, p, j] == self.water_density / self.water_MW * (self.water_permeability_membrane['cem'] + self.water_permeability_membrane['aem']) \
                 * (self.concentrate_channel.properties_out[t].pressure_osm - self.diluate_channel.properties_out[t].pressure_osm)
             else:
-                return self.nonelec_flux[t, p, j] == - (self.ion_diffusivity_membrane['cem', j] / self.membrane_thickness ['cem'] +self.ion_diffusivity_membrane['aem', j] / self.membrane_thickness ['aem']) \
+                return self.nonelec_flux_out[t, p, j] == - (self.ion_diffusivity_membrane['cem', j] / self.membrane_thickness ['cem'] +self.ion_diffusivity_membrane['aem', j] / self.membrane_thickness ['aem']) \
                      * (self.concentrate_channel.properties_out[t].conc_mol_phase_comp[p, j] - self.diluate_channel.properties_out[t].conc_mol_phase_comp[p, j])
 
         # Add constraints for mass transfer terms (diluate_channel)
@@ -388,7 +427,8 @@ class Electrodialysis0DData(UnitModelBlockData):
                          self.config.property_package.component_list,
                          doc="Mass transfer term for the diluate channel")
         def eq_mass_transfer_term_diluate(self, t, p, j):
-            return self.diluate_channel.mass_transfer_term[t, p, j] == - (self.elec_migration_flux[t, p, j] + self.nonelec_flux[t, p, j]) * (self.cell_width * self.cell_length)
+            return self.diluate_channel.mass_transfer_term[t, p, j] == - 0.5 * (self.elec_migration_flux_in[t, p, j] + self.elec_migration_flux_out[t, p, j] \
+                + self.nonelec_flux_in[t, p, j] + self.nonelec_flux_out[t, p, j]) * (self.cell_width * self.cell_length)
             
         # Add constraints for mass transfer terms (concentrate_channel)
         @self.Constraint(self.flowsheet().config.time,
@@ -396,7 +436,8 @@ class Electrodialysis0DData(UnitModelBlockData):
                          self.config.property_package.component_list,
                          doc="Mass transfer term for the concentrate channel")
         def eq_mass_transfer_term_concentrate(self, t, p, j):
-            return self.concentrate_channel.mass_transfer_term[t, p, j] == (self.elec_migration_flux[t, p, j] + self.nonelec_flux[t, p, j]) * (self.cell_width * self.cell_length)
+            return self.concentrate_channel.mass_transfer_term[t, p, j] == 0.5 * (self.elec_migration_flux_in[t, p, j] + self.elec_migration_flux_out[t, p, j] \
+                + self.nonelec_flux_in[t, p, j] + self.nonelec_flux_out[t, p, j])  * (self.cell_width * self.cell_length)
 
         #Add isothermal condition
         @self.Constraint(self.flowsheet().config.time,
@@ -504,20 +545,30 @@ class Electrodialysis0DData(UnitModelBlockData):
             for ind, c in self.eq_current_from_voltage.items():
                 iscale.constraint_scaling_transform(c, iscale.get_scaling_factor(self.membrane_surface_resistence) ** -1)
 
-        iscale.set_scaling_factor(self.elec_migration_flux, 1e6)
-        for ind, c in self.eq_nonelec_flux.items():
+        iscale.set_scaling_factor(self.elec_migration_flux_in, 1e6)
+        iscale.set_scaling_factor(self.elec_migration_flux_out, 1e6)
+        for ind, c in self.eq_nonelec_flux_in.items():
+            if ind[2] == 'H2O':
+                sf = iscale.get_scaling_factor(self.water_permeability_membrane) * \
+                      iscale.get_scaling_factor(self.concentrate_channel.properties_in[ind[0]].pressure_osm)
+            sf = iscale.get_scaling_factor(self.ion_diffusivity_membrane) / iscale.get_scaling_factor(self.membrane_thickness) * \
+                iscale.get_scaling_factor(self.concentrate_channel.properties_in[ind[0]].conc_mol_phase_comp[ind[1], ind[2]])
+            iscale.set_scaling_factor(self.nonelec_flux_in[ind], sf)
+        for ind, c in self.eq_nonelec_flux_out.items():
             if ind[2] == 'H2O':
                 sf = iscale.get_scaling_factor(self.water_permeability_membrane) * \
                       iscale.get_scaling_factor(self.concentrate_channel.properties_out[ind[0]].pressure_osm)
             sf = iscale.get_scaling_factor(self.ion_diffusivity_membrane) / iscale.get_scaling_factor(self.membrane_thickness) * \
                 iscale.get_scaling_factor(self.concentrate_channel.properties_out[ind[0]].conc_mol_phase_comp[ind[1], ind[2]])
-            iscale.set_scaling_factor(self.nonelec_flux[ind], sf)
+            iscale.set_scaling_factor(self.nonelec_flux_out[ind], sf)
         for ind, c in self.eq_mass_transfer_term_diluate.items():
             iscale.constraint_scaling_transform(c, \
-                min(iscale.get_scaling_factor(self.elec_migration_flux[ind]), iscale.get_scaling_factor(self.nonelec_flux[ind])))
+                min(iscale.get_scaling_factor(self.elec_migration_flux_in[ind]), iscale.get_scaling_factor(self.nonelec_flux_in[ind], \
+                    self.elec_migration_flux_out[ind]), iscale.get_scaling_factor(self.nonelec_flux_out[ind])))
         for ind, c in self.eq_mass_transfer_term_concentrate.items():
             iscale.constraint_scaling_transform(c, \
-                min(iscale.get_scaling_factor(self.elec_migration_flux[ind]), iscale.get_scaling_factor(self.nonelec_flux[ind])))
+                min(iscale.get_scaling_factor(self.elec_migration_flux_in[ind]), iscale.get_scaling_factor(self.nonelec_flux_in[ind], \
+                    self.elec_migration_flux_out[ind]), iscale.get_scaling_factor(self.nonelec_flux_out[ind])))
         
         for ind, c in self.eq_isothermal_diluate.items():
             iscale.constraint_scaling_transform(c, self.diluate_channel.properties_in[ind].temperature) 

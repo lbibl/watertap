@@ -11,7 +11,7 @@ import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslog
 
 from watertap.property_models.ion_DSPMDE_prop_pack import DSPMDEParameterBlock
-from electrodialysis_cstr_0d import Electrodialysis0D
+from electrodialysis_0d import Electrodialysis0D
 
 from idaes.core.util import get_solver
 
@@ -118,7 +118,6 @@ m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'C
 
 # NOTE: We have to skip this step for now due to an error in Adams' Prop Pack
 iscale.calculate_scaling_factors(m.fs)
-print(iscale.get_scaling_factor(m.fs.unit.nonelec_flux[0, 'Liq', 'H2O']))
 
 # Intialize the model
 m.fs.unit.initialize(optarg=solver.options, outlvl=idaeslog.DEBUG)
