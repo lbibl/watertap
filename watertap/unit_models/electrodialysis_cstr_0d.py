@@ -334,7 +334,6 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
             doc='Molar flux of a component across the membrane driven by electrical migration')
 
         self.nonelec_flux = Var(
@@ -342,7 +341,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
+            
             doc='Molar flux of a component across the membrane driven by electrical migration')
         
         @self.Constraint(self.flowsheet().config.time,

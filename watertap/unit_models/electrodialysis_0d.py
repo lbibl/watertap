@@ -260,7 +260,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             units=pyunits.amp,
             doc = "Current across a cell-pair"
             )
-        #else:
+            
         if self.config.operation_mode == 'Constant Voltage' :
             self.voltage = Var (
             initialize =  10,
@@ -334,7 +334,6 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
             doc='Molar flux_in of a component across the membrane driven by electrical migration')
 
         self.elec_migration_flux_out = Var(
@@ -342,7 +341,6 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
             doc='Molar flux_in of a component across the membrane driven by electrical migration')
 
         self.nonelec_flux_in = Var(
@@ -350,7 +348,6 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
             doc='Molar flux_out of a component across the membrane driven by electrical migration')
 
         self.nonelec_flux_out = Var(
@@ -358,7 +355,6 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            #units_meta('amount')*units_meta('time')**-1*units_meta('length')**-2,
             doc='Molar flux_out of a component across the membrane driven by electrical migration')
         
         @self.Constraint(self.flowsheet().config.time,
