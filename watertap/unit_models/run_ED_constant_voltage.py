@@ -11,7 +11,7 @@ import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslog
 
 from watertap.property_models.ion_DSPMDE_prop_pack import DSPMDEParameterBlock
-from electrodialysis_0d import Electrodialysis0D
+from electrodialysis_cstr_0d import Electrodialysis0D
 
 from idaes.core.util import get_solver
 
@@ -73,7 +73,7 @@ m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 m.fs.unit.water_trans_number_membrane.fix(1.9)
 m.fs.unit.water_permeability_membrane['cem'].fix(2.16e-14)
 m.fs.unit.water_permeability_membrane['aem'].fix(1.75e-14)
-m.fs.unit.voltage.fix(0.1)
+m.fs.unit.voltage.fix(0.5)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
@@ -143,6 +143,16 @@ m.fs.unit.concentrate_channel.material_balances.pprint()
 # Display the mass transfer terms 
 m.fs.unit.diluate_channel.mass_transfer_term.pprint()
 m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
+
+m.fs.unit.elec_migration_flux_in.pprint()
+#m.fs.unit.elec_migration_flux_in.pprint()
+m.fs.unit.elec_migration_flux_out.pprint()
+#m.fs.unit.concentrate_channel.elec_migration_flux_out.pprint()
+
+m.fs.unit.nonelec_flux_in.pprint()
+#m.fs.unit.concentrate_channel.nonelec_flux_in.pprint()
+m.fs.unit.nonelec_flux_out.pprint()
+#m.fs.unit.concentrate_channel.nonelec_flux_out.pprint()
 
 m.fs.unit.report()
 

@@ -61,6 +61,8 @@ m.fs.unit.inlet_diluate.temperature.fix(298.15)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
 m.fs.unit.inlet_diluate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
+#m.fs.unit.inlet_diluate.conc_mol_phase_comp[0, 'Liq', 'Na_+'].fix(102.67)
+#m.fs.unit.inlet_diluate.conc_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(102.67)
 
 
 m.fs.unit.inlet_concentrate.pressure.fix(101325)
@@ -69,6 +71,8 @@ m.fs.unit.inlet_concentrate.temperature.fix(298.15)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'H2O'].fix(0.013)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Na_+'].fix(2.46e-5)
 m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
+#m.fs.unit.inlet_concentrate.conc_mol_phase_comp[0, 'Liq', 'Na_+'].fix(102.67)
+#m.fs.unit.inlet_concentrate.conc_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(102.67)
 
 
 
@@ -80,7 +84,8 @@ m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
 #m.fs.unit.T = 298.15
-m.fs.unit.membrane_thickness.fix(1.3e-4)
+m.fs.unit.membrane_thickness['aem'].fix(1.3e-4)
+m.fs.unit.membrane_thickness['cem'].fix(1.3e-4)
 m.fs.unit.ion_diffusivity_membrane.fix(7e-9)
 m.fs.unit.ion_trans_number_membrane['cem','Na_+'].fix(1)
 m.fs.unit.ion_trans_number_membrane['aem','Na_+'].fix(0)
@@ -130,16 +135,30 @@ results = solver.solve(m, tee=True)
 
 # Display full set of model info on the unit
 #m.fs.unit.pprint()
-print('Scaling Inspect')
+#print('Scaling Inspect')
 iscale.badly_scaled_var_generator(m.fs,large=10000.0, small=0.001, zero=1e-10, descend_into=True, include_fixed=False)
 print(iscale.unscaled_variables_generator(m.fs.unit))
+
+for i in iscale.unscaled_constraints_generator(m.fs):
+    print(i.name)
+
 # Display the material balance constraints
-m.fs.unit.diluate_channel.material_balances.pprint()
-m.fs.unit.concentrate_channel.material_balances.pprint()
+#m.fs.unit.diluate_channel.material_balances.pprint()
+#m.fs.unit.concentrate_channel.material_balances.pprint()
 
 # Display the mass transfer terms 
 m.fs.unit.diluate_channel.mass_transfer_term.pprint()
 m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
+
+m.fs.unit.elec_migration_flux_in.pprint()
+#m.fs.unit.elec_migration_flux_in.pprint()
+m.fs.unit.elec_migration_flux_out.pprint()
+#m.fs.unit.concentrate_channel.elec_migration_flux_out.pprint()
+
+m.fs.unit.nonelec_flux_in.pprint()
+#m.fs.unit.concentrate_channel.nonelec_flux_in.pprint()
+m.fs.unit.nonelec_flux_out.pprint()
+#m.fs.unit.concentrate_channel.nonelec_flux_out.pprint()
 
 m.fs.unit.report()
 

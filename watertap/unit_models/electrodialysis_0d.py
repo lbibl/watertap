@@ -341,14 +341,14 @@ class Electrodialysis0DData(UnitModelBlockData):
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            doc='Molar flux_in of a component across the membrane driven by electrical migration')
+            doc='Molar flux_out of a component across the membrane driven by electrical migration')
 
         self.nonelec_flux_in = Var(
             self.flowsheet().config.time,
             self.config.property_package.phase_list,
             self.config.property_package.component_list,
             units = pyunits.mole * pyunits.meter ** -2 * pyunits.second ** -1,
-            doc='Molar flux_out of a component across the membrane driven by electrical migration')
+            doc='Molar flux_in of a component across the membrane driven by electrical migration')
 
         self.nonelec_flux_out = Var(
             self.flowsheet().config.time,
@@ -368,7 +368,8 @@ class Electrodialysis0DData(UnitModelBlockData):
                         self.slt_eq_conductivity ** -1 * sum(self.diluate_channel.properties_out[t].conc_mol_phase_comp[p, j] for j in ion_set) ** -1))
             else:
                 return Constraint.NoConstraint 
-                
+        #put if statement outside constraint 
+        #         
         @self.Constraint(self.flowsheet().config.time,
                          self.config.property_package.phase_list,
                          self.config.property_package.component_list,
