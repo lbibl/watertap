@@ -27,7 +27,7 @@ ion_dict = {
                          ("Liq", "Cl_-"): 2.03e-9},
     "mw_data": {"H2O": 18e-3,
                 "Na_+": 23e-3,
-                "Cl_-": 35e-3},
+                "Cl_-": 35.5e-3},
     "stokes_radius_data": {"Na_+": 0.184e-9,
                            "Cl_-": 0.121e-9},
     "charge": {"Na_+": 1,
@@ -79,7 +79,7 @@ m.fs.unit.inlet_concentrate.flow_mol_phase_comp[0, 'Liq', 'Cl_-'].fix(2.46e-5)
 m.fs.unit.water_trans_number_membrane.fix(1.9)
 m.fs.unit.water_permeability_membrane['cem'].fix(2.16e-14)
 m.fs.unit.water_permeability_membrane['aem'].fix(1.75e-14)
-m.fs.unit.current.fix(50)
+m.fs.unit.current.fix(10)
 m.fs.unit.current_utilization.fix(1)
 m.fs.unit.cell_width.fix(0.1)
 m.fs.unit.cell_length.fix(0.43)
@@ -114,7 +114,7 @@ if degrees_of_freedom(m.fs) != 0:
 
 
 # set scaling factors for state vars and call the 'calculate_scaling_factors' function
-m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e2, index=('Liq', 'H2O'))
+m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e3, index=('Liq', 'H2O'))
 m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'Na_+'))
 m.fs.properties.set_default_scaling('flow_mol_phase_comp', 1e5, index=('Liq', 'Cl_-'))
 
@@ -137,10 +137,10 @@ results = solver.solve(m, tee=True)
 #m.fs.unit.pprint()
 #print('Scaling Inspect')
 iscale.badly_scaled_var_generator(m.fs,large=10000.0, small=0.001, zero=1e-10, descend_into=True, include_fixed=False)
-print(iscale.unscaled_variables_generator(m.fs.unit))
+
 
 for i in iscale.unscaled_constraints_generator(m.fs):
-    print(i.name)
+    print('unscaled constraints:',  i.name)
 
 # Display the material balance constraints
 #m.fs.unit.diluate_channel.material_balances.pprint()
@@ -149,6 +149,7 @@ for i in iscale.unscaled_constraints_generator(m.fs):
 # Display the mass transfer terms 
 m.fs.unit.diluate_channel.mass_transfer_term.pprint()
 m.fs.unit.concentrate_channel.mass_transfer_term.pprint()
+
 
 m.fs.unit.elec_migration_flux_in.pprint()
 #m.fs.unit.elec_migration_flux_in.pprint()

@@ -544,6 +544,10 @@ class Electrodialysis0DData(UnitModelBlockData):
 
         iscale.set_scaling_factor(self.elec_migration_flux_in, 1e6)
         iscale.set_scaling_factor(self.elec_migration_flux_out, 1e6)
+        for ind, c in self.eq_elec_migration_flux_in.items():
+            iscale.constraint_scaling_transform(c, 1e6)
+        for ind, c in self.eq_elec_migration_flux_out.items():
+            iscale.constraint_scaling_transform(c, 1e6)
         for ind, c in self.eq_nonelec_flux_in.items():
             if ind[2] == 'H2O':
                 sf = iscale.get_scaling_factor(self.water_permeability_membrane) * \
@@ -551,6 +555,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             sf = iscale.get_scaling_factor(self.ion_diffusivity_membrane) / iscale.get_scaling_factor(self.membrane_thickness) * \
                 iscale.get_scaling_factor(self.concentrate_channel.properties_in[ind[0]].conc_mol_phase_comp[ind[1], ind[2]])
             iscale.set_scaling_factor(self.nonelec_flux_in[ind], sf)
+            iscale.constraint_scaling_transform(c,sf)
         for ind, c in self.eq_nonelec_flux_out.items():
             if ind[2] == 'H2O':
                 sf = iscale.get_scaling_factor(self.water_permeability_membrane) * \
@@ -558,6 +563,7 @@ class Electrodialysis0DData(UnitModelBlockData):
             sf = iscale.get_scaling_factor(self.ion_diffusivity_membrane) / iscale.get_scaling_factor(self.membrane_thickness) * \
                 iscale.get_scaling_factor(self.concentrate_channel.properties_out[ind[0]].conc_mol_phase_comp[ind[1], ind[2]])
             iscale.set_scaling_factor(self.nonelec_flux_out[ind], sf)
+            iscale.constraint_scaling_transform(c,sf)  
         for ind, c in self.eq_mass_transfer_term_diluate.items():
             iscale.constraint_scaling_transform(c, \
                 min(iscale.get_scaling_factor(self.elec_migration_flux_in[ind]), iscale.get_scaling_factor(self.nonelec_flux_in[ind], \

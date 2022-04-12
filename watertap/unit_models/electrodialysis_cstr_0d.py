@@ -504,6 +504,8 @@ class Electrodialysis0DData(UnitModelBlockData):
                 iscale.constraint_scaling_transform(c, iscale.get_scaling_factor(self.membrane_surface_resistence) ** -1)
 
         iscale.set_scaling_factor(self.elec_migration_flux, 1e6)
+        for ind, c in self.eq_elec_migration_flux.items():
+            iscale.constraint_scaling_transform(c, 1e6)
         for ind, c in self.eq_nonelec_flux.items():
             if ind[2] == 'H2O':
                 sf = iscale.get_scaling_factor(self.water_permeability_membrane) * \
