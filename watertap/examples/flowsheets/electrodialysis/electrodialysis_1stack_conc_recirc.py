@@ -71,7 +71,7 @@ def main():
         hold_state=True,
     )
     m.fs.EDstack.voltage_applied[0].fix(10)
-    m.fs.recovery_vol_H2O.fix(0.7)
+    m.fs.recovery_vol_H2O.fix(0.5)
     condition_base(m)
 
     # Initialize and solve the model
@@ -79,7 +79,7 @@ def main():
     solve(m, solver=solver)
     print("\n***---Fully-defined simulation results, Fixed inlet and voltage---***")
     display_model_metrics(m)
-
+    
     # Perform an optimization over cell_length, cell_pair_mum, and voltage_applied
     ed = m.fs.EDstack
     ulim = (
@@ -107,7 +107,7 @@ def main():
     solve(m, solver=solver, tee=True)
     print("\n***---Optimization results, Product conc = 100 ppb---***")
     display_model_metrics(m)
-
+    
     return m
 
 
