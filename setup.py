@@ -52,7 +52,7 @@ SPECIAL_DEPENDENCIES_FOR_PRERELEASE = [
 setup(
     name="watertap",
     url="https://github.com/watertap-org/watertap",
-    version="0.7.0dev",
+    version="0.8.dev0",
     description="WaterTAP modeling library",
     long_description=long_description,
     long_description_content_type="text/plain",
@@ -86,7 +86,10 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
     ],
     keywords="water systems, chemical engineering, process modeling, filtration, desalination, nawi",
-    packages=find_namespace_packages(),
+    # just include watertap and everything under it
+    packages=find_namespace_packages(
+        include=("watertap*",),
+    ),
     python_requires=">=3.7",
     install_requires=[
         # primary requirements for unit and property models
