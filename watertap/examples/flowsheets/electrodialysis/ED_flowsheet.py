@@ -26,19 +26,14 @@ from pyomo.network import Arc
 
 from idaes.core import FlowsheetBlock, UnitModelCostingBlock
 from idaes.core.solvers import get_solver
-from idaes.core.util.initialization import propagate_state, revert_state_vars
-
-# from idaes.core.util.model_statistics import degrees_of_freedom, report_statistics, variables_set
+from idaes.core.util.initialization import propagate_state
 import idaes.core.util.model_statistics as mstat
-from pyomo.core.expr.current import identify_variables
 from idaes.models.unit_models import Feed, Product, Separator, Mixer
 from watertap.unit_models.pressure_changer import Pump
 from idaes.models.unit_models.mixer import MixingType, MomentumMixingType
 import pandas as pd
 import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslogger
-from pytest import approx
-from watertap.core.util.initialization import check_dof
 from watertap.unit_models.electrodialysis_1D import (
     ElectricalOperationMode,
     PressureDropMethod,
@@ -50,294 +45,235 @@ from watertap.unit_models.electrodialysis_1D import Electrodialysis1D
 from watertap.costing.watertap_costing_package import WaterTAPCosting
 from watertap.property_models.multicomp_aq_sol_prop_pack import MCASParameterBlock
 
+
+
 __author__ = "Xiangyu Bi"
+_log = idaeslogger.getLogger(__name__)
 
 
 def main():
-    #feed_sal_list = list(range(1, 15))
-    # wr_list = list(range(0.5, 1, 0.1))
+    solver = get_solver()
+    m = build_full_system()
+    init_and_condition(m, solver,20, 10, 0.6)
+    display_model_metrics(m)
+    #solve_ED_fixed_conc_out(m, solver, 500)
+    optimize_V_Ncp_L_at_fixed_conc_out(m, solver)
+    display_model_metrics(m)
 
-    # initarg_list = _make_initarg_list(list(range(1,15)))
+
+def build_full_system(**kwargs):
+    # need to build all variables and constrainted befor init for param tool
+    m = build()
+    add_objectibe(m)
+    return m
+
+
+def init_and_condition(
+    m, solver, init_conc_mass=2, voltage=10, wr=0.5, **kwargs
+):  # init_conc_mass in g/L or kg/m3
+    init_conc_mol = init_conc_mass / 0.0585  # init_conc_mol in mol/m3
     init_arg = {
         ("flow_vol_phase", ("Liq")): 5.2e-4,
-        ("conc_mol_phase_comp", ("Liq", "Na_+")): 34.188,
-        ("conc_mol_phase_comp", ("Liq", "Cl_-")): 34.188,
-    }
-    deci_var_dict = {
-        "recovery_vol_H2O": 0.5,
-        # "voltage_applied": 10,
-        "cell_pair_num": 100,
-        "prod_salinity": 0.5,
-    }
-    m = build()
-    initialize_dof0_system(m=m, initargs=init_arg, **deci_var_dict)
-    display_model_metrics(m)
-    solve(m, tee=False)
-    display_model_metrics(m)
-    opt_var_dict = {
-        "voltage_applied[0]": (10,),
-        "cell_pair_num": (50, 1, 1000),
-        "cell_length": (1.68, 0.01, 10),
-        "cell_width": (0.197, 0.01, 10),
-    }
-    optimize_LCOW(m, **opt_var_dict)
-    display_model_metrics(m)
-
-
-"""
-    outdt = pd.DataFrame(
-        columns=["Prod_Sal", "Brine_Sal", "WR", "Voltage", "L", "W",   "N_CP", "A_mem", "LCOW", "Speci_Ener"],
-        index=conc_mass_in["C0"],
-    )
-
-    solver = get_solver()
-    for k in initarg:
-        m = build()
-        opt_0_base(m)
-        # print(conc_mol_in["C0"][initarg.index(k)]*0.1)
-        m.fs.feed.properties.calculate_state(
-            k,  # feed molar concentration of Na and Cl ions
-            hold_state=True,
-        )
-        ed = m.fs.EDstack
-        ed.voltage_applied[0].fix(10)
-        m.fs.recovery_vol_H2O.fix(0.5)
-        initialize_system(m, solver=solver)
-        try:
-            solve(m, solver=solver)
-        except:
-            raise RuntimeError(
-                "Solver returns a not optimal solution when"
-                "SOLVING {} at FIXED VOLTAGE".format(k.items())
-            )
-        ulim = (
-            ed.voltage_x[0, 0].value
-            / ed.current_density_x[0, 0].value
-            * ed.current_dens_lim_x[0, 0].value
-            * 1.5
-        )
-        m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
-            conc_mol_in["C0"][initarg.index(k)] * 0.28
-        )
-        m.fs.EDstack.voltage_applied[0].unfix()
-        try:
-            solve(m, solver=solver, tee=False)
-        except:
-            raise RuntimeError(
-                "Solver returns a not optimal solution when"
-                " SOLVING {} at FIXED C_OUT".format(k.items())
-            )
-        # display_model_metrics(m)
-        m.fs.EDstack.voltage_applied[0].unfix()
-        m.fs.EDstack.voltage_applied[0].setlb(0.1)
-        m.fs.EDstack.voltage_applied[0].setub(ulim)
-        m.fs.EDstack.cell_pair_num.unfix()
-        m.fs.EDstack.cell_pair_num.setlb(1)
-        m.fs.EDstack.cell_pair_num.setub(1000)
-        m.fs.EDstack.cell_length.unfix()
-
-        # ed.diluate.properties[0,1].conc_mol_phase_comp["Liq", "Na_+"].unfix()
-        m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(8.547)
-        m.fs.objective = Objective(
-            expr=m.fs.costing.specific_energy_consumption
-        )  # LCOW
-        # mstat.report_statistics(m)
-        try:
-            solve(m, solver=solver, tee=True)
-        except:
-            raise RuntimeError(
-                "Solver returns a not optimal solution when"
-                " OPTIMIZING CPN, L, and V of"
-                " {} at FIXED C_OUT".format(k.items())
-            )
-        display_model_metrics(m)
-        # if not m.fs.EDstack.cell_pair_num == approx(float(round(m.fs.EDstack.cell_pair_num.value)), rel=1e-4):
-        m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
-        try:
-            solve(m, solver=solver, tee=True)
-        except:
-            raise RuntimeError(
-                "Solver returns a not optimal solution when"
-                " OPTIMIZING L, and V of"
-                " {} at FIXED C_OUT".format(k.items())
-            )
-        display_model_metrics(m)
-        outdt["LCOW"][indt["C0"][initarg.index(k)]] = value(m.fs.costing.LCOW)
-        outdt["Speci_Ener"][indt["C0"][initarg.index(k)]] = value(
-            m.fs.costing.specific_energy_consumption
-        )
-        outdt["Voltage"][indt["C0"][initarg.index(k)]] = value(
-            m.fs.EDstack.voltage_applied[0]
-        )
-        outdt["L"][indt["C0"][initarg.index(k)]] = value(m.fs.EDstack.cell_length)
-        outdt["N_CP"][indt["C0"][initarg.index(k)]] = value(m.fs.EDstack.cell_pair_num)
-        outdt["A_mem"][indt["C0"][initarg.index(k)]] = value(m.fs.mem_area)
-
-    print(outdt)
-    outdt.to_csv("~/Documents/Projects/wt_untracked/opt_multiC0__enerq_r50.csv")
-
-    #'''
-"""
-
-
-def _make_initarg_list(*conc_mass_list, mw=0.0585, flow_rate_vol=5.2e-4):
-    conc_mass_in = pd.DataFrame(data=conc_mass_list, columns=["C0"])  # g/L
-    conc_mol_in = conc_mass_in / mw  # mol m-3
-    initarg = []
-    for k in conc_mol_in["C0"]:
-        initarg.append(
-            {
-                ("flow_vol_phase", ("Liq")): flow_rate_vol,
-                ("conc_mol_phase_comp", ("Liq", "Na_+")): k,
-                ("conc_mol_phase_comp", ("Liq", "Cl_-")): k,
-            }
-        )
-    return initarg
-
-
-def initialize_dof0_system(m=None, initargs={}, **deciargs):
-    if m == None:
-        m = build()
+        ("conc_mol_phase_comp", ("Liq", "Na_+")): init_conc_mol,
+        ("conc_mol_phase_comp", ("Liq", "Cl_-")): init_conc_mol,
+    }  # Corresponding to C_feed = 2g/L
     m.fs.feed.properties.calculate_state(
-        initargs,
+        init_arg,
         hold_state=True,
     )
+    m.fs.EDstack.voltage_applied[0].fix(voltage)
+    m.fs.recovery_vol_H2O.fix(wr)
     condition_base(m)
-    print(deciargs)
-
-    for deci_var in deciargs:
-        print(deci_var)
-        comp = m.fs.find_component(str(deci_var))
-        try:
-            assert not comp is None
-        except:
-            comp = m.fs.EDstack.find_component(str(deci_var))
-            try:
-                assert not comp is None
-            except:
-                raise TypeError(
-                    "Var {} in the provided decision_var dict are not found in the model's component".format(
-                        deci_var
-                    )
-                )
-
-        comp.fix(deciargs[deci_var])
-    mstat.report_statistics(m)
-    assert mstat.degrees_of_freedom(m) == 0
-    initialize_system(m)
-
-
-def optimize_LCOW(m, **optargs):
-    if not mstat.degrees_of_freedom(m) == 0:
-        raise TypeError(
-            "A model is expected to be fully defined at zero dof before being optimized."
-        )
-
-    for opt_var in optargs:
-        print(opt_var)
-        var = m.fs.find_component(str(opt_var))
-        try:
-            assert not var is None
-        except:
-            var = m.fs.EDstack.find_component(str(opt_var))
-            try:
-                assert not var is None
-            except:
-                raise TypeError(
-                    "Var {} in the provided opt_var dict are not found in the model's component".format(
-                        opt_var
-                    )
-                )
-        print(var)
-        var.unfix()
-        if len(optargs[opt_var]) == 1:
-            var.set_value(optargs[opt_var][0])
-        elif len(optargs[opt_var]) == 3:
-            var.set_value(optargs[opt_var][0])
-            var.setlb(optargs[opt_var][1])
-            var.setub(optargs[opt_var][2])
-    m.fs.objective = Objective(expr=m.fs.costing.LCOW)
-    # print(mstat.degrees_of_freedom(m),len(optargs))
-    assert mstat.degrees_of_freedom(m) == len(optargs) - 1
-    result = solve(m)
-
-    if not m.fs.EDstack.cell_pair_num.value.is_integer():
-        m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
-    result = solve(m, tee=False)
-    return result
-
-
-def opt0():
-    solver = get_solver()
-    m = build()
-    opt_0_base(m)
-    init_arg = {
-        ("flow_vol_phase", ("Liq")): 5.2e-4,
-        ("conc_mol_phase_comp", ("Liq", "Na_+")): 34.188,
-        ("conc_mol_phase_comp", ("Liq", "Cl_-")): 34.188,
-    }
-    m.fs.feed.properties.calculate_state(
-        init_arg,  # feed molar concentration of Na and Cl ions
-        hold_state=True,
-    )
-    ed = m.fs.EDstack
-    m.fs.EDstack.voltage_applied[0].fix(10)
-    m.fs.recovery_vol_H2O.fix(0.7)
-    # ed.diluate.properties[0,1].conc_mol_phase_comp["Liq", "Na_+"].fix(1.7094)
+    # Initialize and solve the model
     initialize_system(m, solver=solver)
     solve(m, solver=solver)
-    mstat.report_statistics(m)
+'''
+def init_and_condition2(
+    m, solver, init_conc_mass=2, c_out_mass=500, wr=0.5, **kwargs
+):  # init_conc_mass in g/L or kg/m3
+    init_conc_mol = init_conc_mass / 0.0585  # init_conc_mol in mol/m3
+    c_out_mol=c_out_mass/58.5
+    init_arg = {
+        ("flow_vol_phase", ("Liq")): 5.2e-4,
+        ("conc_mol_phase_comp", ("Liq", "Na_+")): init_conc_mol,
+        ("conc_mol_phase_comp", ("Liq", "Cl_-")): init_conc_mol,
+    }  # Corresponding to C_feed = 2g/L
+    m.fs.feed.properties.calculate_state(
+        init_arg,
+        hold_state=True,
+    )
+   
+    m.fs.recovery_vol_H2O.fix(wr)
+    condition_base(m)
+    # Initialize and solve the model
+    initialize_system(m, solver=solver)
+     m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        c_out_mol
+    )
+    solve(m, solver=solver)
+'''
+def solve_ED_fixed_voltage(m, solver, vol=10, **kwargs):
+    m.fs.EDstack.voltage_applied[0].unfix()
+    m.fs.EDstack.voltage_applied[0].fix(vol)
+    results = solve(m, solver=solver, tee=False)
+    m.state_after_box_solve = modelStateStorage(m)
+    return results
+
+def solve_ED_fixed_removal(m, solver, rm=0.8, **kwargs):
+    if rm < 0 or rm > 1:
+        raise ValueError("The removal must be a real number between 0 an 1")
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        m.fs.feed.properties[0].conc_mol_phase_comp["Liq", "Na_+"].value * (1 - rm)
+    )
+    m.fs.EDstack.voltage_applied[0].unfix()
+    results = solve(m, solver=solver, tee=False)
+    m.state_after_box_solve = modelStateStorage(m)
+    return results
+
+
+def solve_ED_fixed_conc_out(
+    m, solver, conc_out_mass=500, **kwargs
+):  # conc_out_mass in mg/L
+    conc_out_mol = conc_out_mass / 58.5  # conc_out_mol in mol/m3
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        conc_out_mol
+    )  # conc_o in mol/m^3, corresopnding to 100 ppb.
+    m.fs.EDstack.voltage_applied[0].unfix()
+    results = solve(m, solver=solver, tee=False)
+    m.state_after_box_solve = modelStateStorage(m)
+    return results
+
+
+def step_solve_conditioned_system(m, solver, **solve_fun):
+    results = stepTool.step_optimize(
+        m,
+        solver,
+        solve_fun,
+        m.state_after_box_solve,
+        steps=5,
+        try_final_first=True,
+        re_steps=3,
+    )
+    return results
+
+
+def optimize_V_Ncp_L_at_fixed_conc_out(m, solver, conc_o=8.547, **kwargs):
+    solve_ED_fixed_removal(m, solver, rm=0.5, **kwargs)
     display_model_metrics(m)
+    ed = m.fs.EDstack
     ulim = (
         ed.voltage_x[0, 0].value
         / ed.current_density_x[0, 0].value
         * ed.current_dens_lim_x[0, 0].value
-        * 1.5
+        * 5
     )
-    # print(ed.voltage_x[0,0].value)
-    # print(ed.current_density_x[0,0].value)
-    # print(ed.current_dens_lim_x[0,0].value)
-    print(f"U_ub={ulim}")
-    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(8.547)
-    m.fs.EDstack.voltage_applied[0].unfix()
-    solve(m, solver=solver, tee=False)
-    display_model_metrics(m)
 
     m.fs.EDstack.voltage_applied[0].unfix()
     m.fs.EDstack.voltage_applied[0].setlb(0.1)
     m.fs.EDstack.voltage_applied[0].setub(ulim)
+    
     m.fs.EDstack.cell_pair_num.unfix()
     m.fs.EDstack.cell_pair_num.setlb(1)
-    m.fs.EDstack.cell_pair_num.setub(500)
+    m.fs.EDstack.cell_pair_num.setub(1000)
     m.fs.EDstack.cell_length.unfix()
-
-    # ed.diluate.properties[0,1].conc_mol_phase_comp["Liq", "Na_+"].unfix()
-    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(1.7094)
-
-    m.fs.objective = Objective(expr=m.fs.costing.LCOW)
-    mstat.report_statistics(m)
-    solve(m, solver=solver, tee=True)
-    display_model_metrics(m)
-    print(round(m.fs.EDstack.cell_pair_num.value))
-    # if not m.fs.EDstack.cell_pair_num == approx(float(round(m.fs.EDstack.cell_pair_num.value)), rel=1e-4):
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        conc_o
+    )  # Corresponding to C_product = 100 ppb
+    m.fs.objective.activate()
+    solve(m, solver=solver, tee=False)
     m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
-    solve(m, solver=solver, tee=True)
+    result = solve(m, solver=solver, tee=False)
+    return result
+
+def optimize_V_Ncp_L_w_at_fixed_conc_out(m, solver, conc_o=8.547, **kwargs):
+    solve_ED_fixed_removal(m, solver, rm=0.5, **kwargs)
     display_model_metrics(m)
+    ed = m.fs.EDstack
+    ulim = (
+        ed.voltage_x[0, 0].value
+        / ed.current_density_x[0, 0].value
+        * ed.current_dens_lim_x[0, 0].value
+        * 5
+    )
 
-    # initialize_system(m, solver=solver)
-    # display_model_metrics(m)
-    # m.fs.EDstack.voltage_applied.unfix()
-    # revert_state_vars(m.fs.feed, flags=flag_feed)
+    m.fs.EDstack.voltage_applied[0].unfix()
+    m.fs.EDstack.voltage_applied[0].setlb(0.1)
+    m.fs.EDstack.voltage_applied[0].setub(ulim)
+    
+    m.fs.EDstack.cell_pair_num.unfix()
+    m.fs.EDstack.cell_pair_num.setlb(1)
+    m.fs.EDstack.cell_pair_num.setub(1000)
+    m.fs.EDstack.cell_length.unfix()
+    m.fs.EDstack.cell_width.unfix()
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        conc_o
+    )  # Corresponding to C_product = 100 ppb
+    m.fs.objective.activate()
+    solve(m, solver=solver, tee=False)
+    m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
+    result = solve(m, solver=solver, tee=False)
+    return result
 
+def optimize_V_Ncp_w_at_fixed_conc_out(m, solver, conc_o=8.547, **kwargs):
+    solve_ED_fixed_removal(m, solver, rm=0.5, **kwargs)
+    display_model_metrics(m)
+    ed = m.fs.EDstack
+    ulim = (
+        ed.voltage_x[0, 0].value
+        / ed.current_density_x[0, 0].value
+        * ed.current_dens_lim_x[0, 0].value
+        * 5
+    )
 
-"""
-    m.fs.feed.properties[0].flow_mol_phase_comp["Liq", "H2O"].fix(28.83)
-    m.fs.feed.properties[0].flow_mol_phase_comp["Liq", "Na_+"].fix(1.78e-2)
-    m.fs.feed.properties[0].flow_mol_phase_comp["Liq", "Cl_-"].fix(1.78e-2)
-    m.fs.recovery_vol_H2O.fix(0.6)
-    m.fs.EDstack.voltage_applied[0].fix(10)
-    #
-    """
+    m.fs.EDstack.voltage_applied[0].unfix()
+    m.fs.EDstack.voltage_applied[0].setlb(0.1)
+    m.fs.EDstack.voltage_applied[0].setub(ulim)
+    
+    m.fs.EDstack.cell_pair_num.unfix()
+    m.fs.EDstack.cell_pair_num.setlb(1)
+    m.fs.EDstack.cell_pair_num.setub(1000)
+    #m.fs.EDstack.cell_length.unfix()
+    m.fs.EDstack.cell_width.unfix()
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        conc_o
+    )  # Corresponding to C_product = 100 ppb
+    m.fs.objective.activate()
+    solve(m, solver=solver, tee=False)
+    m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
+    result = solve(m, solver=solver, tee=False)
+    return result
+
+def optimize_V_Ncp_at_fixed_conc_out(m, solver, conc_o=8.547, **kwargs):
+    solve_ED_fixed_removal(m, solver, rm=0.5, **kwargs)
+    display_model_metrics(m)
+    ed = m.fs.EDstack
+    ulim = (
+        ed.voltage_x[0, 0].value
+        / ed.current_density_x[0, 0].value
+        * ed.current_dens_lim_x[0, 0].value
+        * 10
+    )
+
+    m.fs.EDstack.voltage_applied[0].unfix()
+    m.fs.EDstack.voltage_applied[0].setlb(0.1)
+    m.fs.EDstack.voltage_applied[0].setub(ulim)
+    
+    m.fs.EDstack.cell_pair_num.unfix()
+    m.fs.EDstack.cell_pair_num.setlb(1)
+    m.fs.EDstack.cell_pair_num.setub(1000)
+    #m.fs.EDstack.cell_length.unfix()
+    m.fs.prod.properties[0].conc_mol_phase_comp["Liq", "Na_+"].fix(
+        conc_o
+    )  # Corresponding to C_product = 100 ppb
+    m.fs.objective.activate()
+    solve(m, solver=solver, tee=False)
+    m.fs.EDstack.cell_pair_num.fix(round(m.fs.EDstack.cell_pair_num.value))
+    result = solve(m, solver=solver, tee=False)
+    return result
+
+def add_objectibe(m):
+    m.fs.objective = Objective(expr=m.fs.costing.LCOW)
+    m.fs.objective.deactivate()
 
 
 def build():
@@ -450,6 +386,9 @@ def build():
         units=pyunits.meter**2,
         doc="Total membrane area for cem (or aem) in one stack",
     )
+    m.fs.feed_salinity = Var(
+        initialize=1, bounds=(0, 1000), units=pyunits.kg * pyunits.meter**-3
+    )
     m.fs.prod_salinity = Var(
         initialize=1, bounds=(0, 1000), units=pyunits.kg * pyunits.meter**-3
     )
@@ -464,6 +403,14 @@ def build():
     m.fs.eq_electrodialysis_equal_flow = Constraint(
         expr=m.fs.EDstack.diluate.properties[0, 0].flow_vol_phase["Liq"]
         == m.fs.EDstack.concentrate.properties[0, 0].flow_vol_phase["Liq"]
+    )
+
+    m.fs.eq_feed_salinity = Constraint(
+        expr=m.fs.feed_salinity
+        == sum(
+            m.fs.feed.properties[0].conc_mass_phase_comp["Liq", j]
+            for j in m.fs.properties.ion_set | m.fs.properties.solute_set
+        )
     )
 
     m.fs.eq_product_salinity = Constraint(
@@ -509,41 +456,6 @@ def build():
     TransformationFactory("network.expand_arcs").apply_to(m)
 
     return m
-
-
-'''
-def simu_var_wr_fc(m):
-    m.fs.feed.properties[0].pressure.fix(101325)  # feed pressure [Pa]
-    m.fs.feed.properties[0].temperature.fix(298.15)  # feed temperature [K]
-    m.fs.EDstack.concentrate.properties[0,0].temperature.fix(298.15)
-    m.fs.EDstack.concentrate.properties[0,0].pressure.fix(101325)
-
-    feed_in_Na_conc=(3.931623932, 3.145299145, 2.358974359, 1.572649573,0.786324786,0.393162393)
-    feed_in_Cl_conc=(6.068376068,	4.854700855,	3.641025641,	2.427350427,	1.213675214,	0.606837607)
-    #for i in feed_in_Na_conc
-@build()
-def simu_var_WatRec_FeedConc(m,wr_args=None,in_conc_args=None):
-    """
-        Method to simulate scenarios where water recovery and feed water ion
-        concentrations are input variables.
-
-        Keyword Arguments:
-            wr_args : dict containing a series of water recovery values. 
-            in_conc_args: dict containing inlet ion concentration values
-        """
-    
-    m.fs.feed.properties[0].pressure.fix(101325)  # feed pressure [Pa]
-    m.fs.feed.properties[0].temperature.fix(298.15)  # feed temperature [K]
-    m.fs.EDstack.concentrate.properties[0,0].temperature.fix(298.15)
-    m.fs.EDstack.concentrate.properties[0,0].pressure.fix(101325)
-    
-    for ind, val in in_conc_args.items():
-        m.fs.feed.properties.calculate_state({
-            ("flow_vol_phase","Liq"):4e-3,
-            ("conc_mass_phase_comp",ind):val,
-            ("conc_mass_phase_comp",("Liq","Cl_-")):1.214})
-
-'''
 
 
 def condition_base(m):
@@ -599,17 +511,22 @@ def condition_base(m):
     mstat.report_statistics(m)
 
 
-def solve(blk, solver=None, tee=True, check_termination=True):
+def solve(m, solver=None, tee=False, check_termination=True):
     if solver is None:
         solver = get_solver()
-    results = solver.solve(blk, tee=tee)
+    results = solver.solve(m, tee=tee)
+    try:
+        assert_optimal_termination(results)
+        print("solved okay")
+    except:
+        print("failed to solve")
+        pass
     if check_termination:
         assert_optimal_termination(results)
     return results
 
 
 def initialize_system(m, solver=None):
-
     # set up solver
     if solver is None:
         solver = get_solver()
@@ -681,10 +598,7 @@ def display_model_metrics(m):
         "Feed": [
             value(m.fs.feed.properties[0].flow_vol_phase["Liq"]),
             value(
-                sum(
-                    m.fs.feed.properties[0].conc_mass_phase_comp["Liq", j]
-                    for j in m.fs.properties.ion_set
-                )
+                m.fs.feed_salinity
             ),
         ],
         "Product": [
@@ -712,7 +626,6 @@ def display_model_metrics(m):
             value(m.fs.EDstack.cell_length),
             value(m.fs.EDstack.voltage_applied[0]),
             value(m.fs.costing.specific_energy_consumption),
-            value(m.fs.EDstack.specific_power_electrical[0]),
             value(m.fs.costing.LCOW),
         ],
         columns=["value"],
@@ -723,7 +636,6 @@ def display_model_metrics(m):
             "ED cell flow path length",
             "Operation Voltage, V",
             "Specific energy consumption, kWh/m3",
-            "Specific energy consumption by unit model, kWh/m3",
             "Levelized cost of water, $/m3",
         ],
     )
