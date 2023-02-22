@@ -35,6 +35,7 @@ from idaes.models.unit_models import Feed, Product, Separator, Mixer
 from watertap.unit_models.pressure_changer import Pump
 from idaes.models.unit_models.mixer import MixingType, MomentumMixingType
 import pandas as pd
+import numpy as np
 import idaes.core.util.scaling as iscale
 import idaes.logger as idaeslogger
 from pytest import approx
@@ -49,15 +50,24 @@ from watertap.unit_models.electrodialysis_1D import (
 from watertap.unit_models.electrodialysis_1D import Electrodialysis1D
 from watertap.costing.watertap_costing_package import WaterTAPCosting
 from watertap.property_models.multicomp_aq_sol_prop_pack import MCASParameterBlock
+from IPython import display
 
 __author__ = "Xiangyu Bi"
 
 
 def main():
-    #feed_sal_list = list(range(1, 15))
+    feed_sal_list = list(range(1, 15))
+    conc_mass_in = pd.DataFrame(feed_sal_list, columns=["C0"]) 
     # wr_list = list(range(0.5, 1, 0.1))
-
-    # initarg_list = _make_initarg_list(list(range(1,15)))
+    initarg_list = _make_initarg_list(feed_sal_list)
+    wr_list=list(np.round(np.arange(0.5, 0.95, 0.05), 2))
+    print(initarg_list)
+    print(wr_list)
+    outdt = pd.DataFrame(
+        columns=["Prod_Sal", "Brine_Sal", "WR", "Voltage", "L", "W",   "N_CP", "A_mem", "LCOW", "Speci_Ener"],
+        index=conc_mass_in["C0"],
+    )
+    """
     init_arg = {
         ("flow_vol_phase", ("Liq")): 5.2e-4,
         ("conc_mol_phase_comp", ("Liq", "Na_+")): 34.188,
@@ -82,6 +92,7 @@ def main():
     }
     optimize_LCOW(m, **opt_var_dict)
     display_model_metrics(m)
+"""
 
 
 """
@@ -180,7 +191,7 @@ def main():
 """
 
 
-def _make_initarg_list(*conc_mass_list, mw=0.0585, flow_rate_vol=5.2e-4):
+def _make_initarg_list(conc_mass_list, mw=0.0585, flow_rate_vol=5.2e-4):
     conc_mass_in = pd.DataFrame(data=conc_mass_list, columns=["C0"])  # g/L
     conc_mol_in = conc_mass_in / mw  # mol m-3
     initarg = []
