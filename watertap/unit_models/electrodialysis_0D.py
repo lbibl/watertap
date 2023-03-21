@@ -56,8 +56,8 @@ _log = idaeslog.getLogger(__name__)
 
 class LimitingCurrentDensityMethod(Enum):
     InitialValue = 0
-    # Empirical = 1
-    # Theoretical = 2 TODO: 1 and 2
+    Empirical = 1
+    Theoretical = 2 
 
 
 class ElectricalOperationMode(Enum):
@@ -206,8 +206,8 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
            :header: "Configuration Options", "Description"
 
            "``LimitingCurrentDensityMethod.InitialValue``", "Limiting current is calculated from a single initial value of the feed solution tested by the user."
-           "``LimitingCurrentDensityMethod.Empirical``", "Limiting current density is caculated from the empirical equation: TODO"
-           "``LimitingCurrentDensityMethod.Theoretical``", "Limiting current density is calculated from a theoretical equation: TODO"
+           "``LimitingCurrentDensityMethod.Empirical``", "Limiting current density is caculated from the empirical equation."
+           "``LimitingCurrentDensityMethod.Theoretical``", "Limiting current density is calculated from a theoretical equation."
        """,
         ),
     )
@@ -387,10 +387,16 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
             units=pyunits.meter,
             doc="The length of the electrodialysis cell, denoted as l in the model description",
         )
-        self.spacer_thickness = Var(
+        self.channel_height = Var(
             initialize=0.0001,
             units=pyunits.meter,
             doc="The distance between the consecutive aem and cem",
+        )
+        self.spacer_porosity = Var(
+            initialize=0.7,
+            bounds=(0.01, 1),
+            units=pyunits.dimensionless,
+            doc='The prosity of spacer in the ED channels. This is also referred to elsewhere as "void fraction" or "volume parameters"',
         )
 
         # Material and Operational properties
@@ -573,9 +579,14 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
         if self.config.is_isothermal:
             self.diluate.add_isothermal_assumption()
         self.diluate.add_momentum_balances(
-            balance_type=self.config.momentum_balance_type, has_pressure_change=self.config.has_pressure_chage,
+            balance_type=self.config.momentum_balance_type, has_pressure_change=self.config.has_pressure_change,
         )
-
+        add_object_reference(
+            self, "dens_mass", self.diluate.properties_in[ 0].dens_mass_phase["Liq"]
+        )
+        add_object_reference(
+            self, "visc_d", self.diluate.properties_in[ 0].visc_d_phase["Liq"]
+        )
         # Build control volume for the concentrate channel
         self.concentrate = ControlVolume0DBlock(
             dynamic=False,
@@ -595,7 +606,7 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
         if self.config.is_isothermal:
             self.concentrate.add_isothermal_assumption()
         self.concentrate.add_momentum_balances(
-            balance_type=self.config.momentum_balance_type, has_pressure_change=self.config.has_pressure_chage,
+            balance_type=self.config.momentum_balance_type, has_pressure_change=self.config.has_pressure_change,
         )
         
 
@@ -624,19 +635,17 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
 
             @self.Constraint(
                 self.flowsheet().time,
-                self.diluate.length_domain,
                 doc="Express deltaP_term by the calculated pressure drop data, diluate.",
             )
-            def eq_deltaP_diluate(self, t, x):
-                return self.diluate.deltaP[t, x] == -self.pressure_drop[t]*self.cell_length
+            def eq_deltaP_diluate(self, t):
+                return self.diluate.deltaP[t] == -self.pressure_drop[t]*self.cell_length
 
             @self.Constraint(
                 self.flowsheet().time,
-                self.diluate.length_domain,
                 doc="Express deltaP_term by the calculated pressure drop data, concentrate.",
             )
-            def eq_deltaP_concentrate(self, t, x):
-                return self.concentrate.deltaP[t, x] == -self.pressure_drop[t]*self.cell_length
+            def eq_deltaP_concentrate(self, t):
+                return self.concentrate.deltaP[t] == -self.pressure_drop[t]*self.cell_length
 
         elif self.config.pressure_drop_method == PressureDropMethod.none and (
             not self.config.has_pressure_change
@@ -652,9 +661,9 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
             self.flowsheet().time,
             doc="Calculate flow velocity in a single diluate channel",
         )
-        def eq_get_velocity_diluate(self, t, x):
+        def eq_get_velocity_diluate(self, t):
             return (
-                self.velocity_diluate[t, x]
+                self.velocity_diluate[t]
                 * self.cell_width
                 * self.channel_height
                 * self.spacer_porosity
@@ -666,9 +675,9 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
             self.flowsheet().time,
             doc="Calculate flow velocity in a single concentrate channel",
         )
-        def eq_get_velocity_concentrate(self, t, x):
+        def eq_get_velocity_concentrate(self, t):
             return (
-                self.velocity_concentrate[t, x]
+                self.velocity_concentrate[t]
                 * self.cell_width
                 * self.channel_height
                 * self.spacer_porosity
@@ -686,7 +695,7 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
                     self.membrane_areal_resistance["aem"]
                     + self.membrane_areal_resistance["cem"]
                     + (
-                        self.spacer_thickness
+                        self.channel_height
                         - self.dl_thickness_ioa["cem", "cathode_left", t]
                         - self.dl_thickness_ioa["aem", "anode_right", t]
                     )
@@ -697,7 +706,7 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
                     )
                     ** -1
                     + (
-                        self.spacer_thickness
+                        self.channel_height
                         - self.dl_thickness_ioa["cem", "anode_right", t]
                         - self.dl_thickness_ioa["aem", "cathode_left", t]
                     )
@@ -712,7 +721,7 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
                 total_areal_resistance = (
                     self.membrane_areal_resistance["aem"]
                     + self.membrane_areal_resistance["cem"]
-                    + self.spacer_thickness
+                    + self.channel_height
                     * (
                         0.5**-1
                         * (
@@ -1213,6 +1222,67 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
                         for j in self.cation_set
                     )
                 )
+            elif (
+            self.config.limiting_current_density_method
+            == LimitingCurrentDensityMethod.Empirical
+            ):
+                self.param_b = Param(
+                    initialize=0.5,
+                    units=pyunits.dimensionless,
+                    doc="emprical parameter b to calculate limitting current density",
+                )
+                self.param_a = Param(
+                    initialize=25,
+                    units=pyunits.coulomb
+                    * pyunits.mol**-1
+                    * pyunits.meter ** (1 - self.param_b)
+                    * pyunits.second ** (self.param_b - 1),
+                    doc="emprical parameter a to calculate limitting current density",
+                )
+
+                @self.Constraint(
+                    self.flowsheet().time,
+                    doc="Calculate length-indexed limiting current density",
+                )
+                def eq_current_dens_lim_ioa(self, t):
+
+                    return self.current_dens_lim_ioa[
+                        t
+                    ] == self.param_a * self.velocity_diluate[t] ** self.param_b * sum(
+                        self.config.property_package.charge_comp[j]
+                        * 0.5*(self.diluate.properties_in[t].conc_mol_phase_comp["Liq", j]+self.diluate.properties_out[t].conc_mol_phase_comp["Liq", j])
+                        for j in self.cation_set
+                    )
+
+            elif (
+                self.config.limiting_current_density_method
+                == LimitingCurrentDensityMethod.Theoretical
+            ):
+                self._get_fluid_dimensionless_quantities()
+
+                @self.Constraint(
+                    self.flowsheet().time,
+                    doc="Calculate length-indexed limiting current density",
+                )
+                def eq_current_dens_lim_ioa(self, t):
+                    return self.current_dens_lim_ioa[
+                        t
+                    ] == self.N_Sh * self.diffus_mass * self.hydraulic_diameter**-1 * Constants.faraday_constant * (
+                        sum(
+                            self.ion_trans_number_membrane["cem", j]
+                            / self.config.property_package.charge_comp[j]
+                            for j in self.cation_set
+                        )
+                        - sum(
+                            self.diluate.properties_in[t].trans_num_phase_comp["Liq", j]
+                            / self.config.property_package.charge_comp[j]
+                            for j in self.cation_set
+                        )
+                    ) ** -1 * sum(
+                        self.config.property_package.charge_comp[j]
+                        * 0.5*(self.diluate.properties_in[t].conc_mol_phase_comp["Liq", j]+self.diluate.properties_out[t].conc_mol_phase_comp["Liq", j])
+                        for j in self.cation_set
+                    )
 
         @self.Constraint(
             self.membrane_set,
@@ -1831,7 +1901,7 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
                     self.pressure_drop[t]
                     == self.dens_mass
                     * self.friction_factor
-                    * self.velocity_diluate[0, 0] ** 2
+                    * self.velocity_diluate[0] ** 2
                     * 0.5
                     * self.hydraulic_diameter**-1
                 )
@@ -1980,8 +2050,10 @@ class Electrodialysis0DData(InitializationMixin, UnitModelBlockData):
             iscale.set_scaling_factor(self.cell_length, 1e1)
         if iscale.get_scaling_factor(self.cell_width, warning=True) is None:
             iscale.set_scaling_factor(self.cell_width, 1e1)
-        if iscale.get_scaling_factor(self.spacer_thickness, warning=True) is None:
-            iscale.set_scaling_factor(self.spacer_thickness, 1e4)
+        if iscale.get_scaling_factor(self.channel_height, warning=True) is None:
+            iscale.set_scaling_factor(self.channel_height, 1e4)
+        if iscale.get_scaling_factor(self.spacer_porosity, warning=True) is None:
+            iscale.set_scaling_factor(self.spacer_porosity, 1)
         if (
             iscale.get_scaling_factor(self.membrane_areal_resistance, warning=True)
             is None
